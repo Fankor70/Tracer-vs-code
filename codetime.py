@@ -62,7 +62,7 @@ import mentor   # Наставник: ИИ-помощник по фронтен�
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '2.0.1'
+APP_VERSION = '2.4.0'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
@@ -1819,7 +1819,47 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(mentor.api_memory())
         if route == '/api/mentor/history':
             return self._json(mentor.api_history(qs))
+        if route == '/api/or/settings':
+            return self._json(mentor.or_settings_get())
+        if route == '/api/team/history':
+            return self._json(mentor.team_history(qs))
+        if route == '/api/mentor/chats':
+            try:
+                if qs.get('id'):
+                    return self._json(mentor.chat_get(qs['id'][0]))
+                return self._json(mentor.chats_list())
+            except mentor.MentorError as e:
+                return self._json({'error': str(e)}, code=400)
+        if route == '/api/mentor/journal':
+            return self._json(mentor.api_journal_get())
+        if route == '/api/mentor/plan':
+            return self._json(mentor.api_plan_get())
+        if route == '/api/github/tree':
+            try:
+                return self._json(mentor.api_github_tree(qs))
+            except mentor.MentorError as e:
+                return self._json({'error': str(e)}, code=400)
+        if route == '/api/mentor/layout-img':
+            return self._api_layout_img(qs)
         return self._json({'error': 'Не найдено'}, code=404)
+
+    def _api_layout_img(self, qs):
+        """GET /api/mentor/layout-img?name=… — фото макета из layouts/."""
+        name = (qs.get('name', [''])[0] or '').strip()
+        if ('/' in name or '\\' in name or '..' in name or not name):
+            return self._send(400, b'bad name', 'text/plain')
+        path = os.path.join(mentor.LAYOUTS_DIR, name)
+        if not os.path.isfile(path):
+            return self._send(404, b'not found', 'text/plain')
+        ext = os.path.splitext(name)[1].lower()
+        mime = {'.png': 'image/png', '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+                '.gif': 'image/gif'}.get(ext, 'application/octet-stream')
+        try:
+            with open(path, 'rb') as f:
+                return self._send(200, f.read(), mime)
+        except OSError:
+            return self._send(500, b'read error', 'text/plain')
 
     def _serve_dashboard(self):
         try:
@@ -2073,7 +2113,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._api_settings_post()   # исторический роут (старый формат разбора)
         if route == '/api/update':
             return self._api_update()          # сырые байты exe, не JSON
-        if route.startswith('/api/mentor/'):
+        if (route.startswith('/api/mentor/') or route.startswith('/api/or/')
+                or route.startswith('/api/team/')
+                or (route.startswith('/api/github/')
+                    and route != '/api/github/tree')):
             return self._mentor_post(route)
         handler = self.POST_ROUTES.get(route)
         if handler is None:

@@ -69,9 +69,9 @@ jobs:
           if ver not in html:
               sys.exit('::error::в dashboard.html нет версии %r — файл из другого релиза?' % ver)
           for probe in ('<!DOCTYPE html>', '</html>', '<script>', 'id="updateStatus"', 'id="installBtn"',
-                        'id="mentorMsgs"', 'id="mentorSendBtn"', 'data-tab="mentor"', 'id="tab-mentor"',
-                        'function hlCode', 'function mdRender', 'id="mentorPlanView"', 'id="mentorNotesText"',
-                        'md-tasks', 'm-meta'):
+                        'class="sidenav"', 'id="sideBurger"', 'id="topTitle"', 'id="sideVersion"',
+                        'id="chatMsgs"', 'id="teamRun"', 'id="nplanList"', 'id="njournalText"',
+                        'function hlCode', 'function mdRender', 'c-ava', 'md-tasks', 'm-meta'):
               if probe not in html:
                   sys.exit('::error::в dashboard.html нет обязательного фрагмента %r — файл повреждён' % probe)
           print('dashboard.html OK: %d байт, версия %s, все фрагменты на месте' % (size, ver))
