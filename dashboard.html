@@ -518,6 +518,12 @@
     color: var(--amber); padding: 8px 20px; font-size: 13px; text-align: center;
   }
   .demo-banner b { color: var(--amber); }
+  .demo-retry {
+    margin-left: 10px; padding: 3px 12px; font-size: 12px; cursor: pointer;
+    background: transparent; color: var(--amber);
+    border: 1px solid rgba(245,158,11,.5); border-radius: 6px;
+  }
+  .demo-retry:hover { background: rgba(245,158,11,.15); }
   /* ---------- Пустые состояния ---------- */
   .empty { color: var(--muted); text-align: center; padding: 26px 10px; font-size: 14px; }
   .empty .big { font-size: 30px; display: block; margin-bottom: 8px; }
@@ -1729,9 +1735,13 @@ function api(path) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }).catch(function (err) {
-    enableDemo();
-    var d = demoData(path);
-    if (d !== undefined) return d;
+    // v2.4.1: демо-данными отвечаем ТОЛЬКО если демо уже включено
+    // (статический предпросмотр). Разовый сбой GET больше не выключает
+    // приложение — ошибка уходит в обработчик конкретной секции.
+    if (DEMO) {
+      var d0 = demoData(path);
+      if (d0 !== undefined) return d0;
+    }
     throw err;
   });
 }
@@ -1760,9 +1770,12 @@ function enableDemo() {
   document.body.classList.add('demo');
   var b = document.createElement('div');
   b.className = 'demo-banner';
-  b.innerHTML = '🟡 <b>Демо-режим</b> — примерные данные для предпросмотра дизайна. ' +
-    'Запустите CodeTime — здесь появится ваша реальная статистика.';
+  b.innerHTML = '🟡 <b>Демо-режим</b> — примерные данные для предпросмотра дизайна: ' +
+    'приложение CodeTime не отвечает. ' +
+    '<button type="button" id="demoRetry" class="demo-retry">⟳ Подключиться к приложению</button>';
   document.body.insertBefore(b, document.body.firstChild);
+  var rb = document.getElementById('demoRetry');
+  if (rb) rb.addEventListener('click', function () { location.reload(); });
 }
 
 var DEMO_OR_KEY = false;
@@ -1805,6 +1818,23 @@ var DEMO_PLAN = {
   raw: '# План обучения — Junior/Middle к апрелю 2027\n\n- [ ] Сентябрь 2026 — HTML/CSS вёрстка по макету + основы JS\n- [ ] Октябрь 2026 — JS-приложение с публичным API\n- [ ] Ноябрь 2026 — React\n- [ ] Декабрь 2026 — CRUD-мини-CRM + авторизация\n- [ ] Январь 2027 — Telegram-бот на Python (aiogram)\n- [ ] Февраль 2027 — Бот + сайт + БД\n- [ ] Март 2027 — Open source и резюме\n- [ ] Апрель 2027 — Отклики\n'
 };
 
+// ---------- демо-состояние чатов: создание/удаление/отправка работают ----------
+var DEMO_CHAT_STATE = null;
+
+function demoChats() {
+  if (!DEMO_CHAT_STATE) {
+    DEMO_CHAT_STATE = [{ id: 'demo1', title: 'Разбор страницы товара',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      messages: [] }];
+  }
+  return DEMO_CHAT_STATE;
+}
+
+function demoChatMeta(c) {
+  return { id: c.id, title: c.title, updatedAt: c.updatedAt,
+           messageCount: c.messages.length };
+}
+
 function demoPost(path, body) {
   // Наставник: в демо отвечаем заготовленным разбором, чтобы предпросмотр был живым
   if (path === '/api/mentor/chat') {
@@ -1841,9 +1871,18 @@ function demoPost(path, body) {
   if (path === '/api/mentor/github-collect') return Promise.resolve({ ok: true, repo: 'Fankor70/product-page', branch: 'main', files: 12, commits: 8, ts: new Date().toISOString(), summary: 'Репозиторий Fankor70/product-page: 12 файлов, 8 последних коммитов. Теперь наставник видит структуру — попросите «проверь мой код, файлы: путь/к/файлу».' });
   if (path === '/api/mentor/memory-save') return Promise.resolve({ ok: true, saved: Object.keys(body) });  if (path === '/api/mentor/open-folder') return Promise.resolve({ ok: true });
   if (path === '/api/mentor/chats') {
-    if (body.delete) return Promise.resolve({ ok: true });
-    return Promise.resolve({ chat: { id: 'demo' + Date.now(), title: 'Новый чат',
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messageCount: 0 } });
+    var chats = demoChats();
+    if (body.delete) {
+      var di = chats.findIndex(function (c) { return c.id === body.delete; });
+      if (di >= 0) chats.splice(di, 1);
+      return Promise.resolve({ ok: true });
+    }
+    var ncTs = new Date().toISOString();
+    var nc = { id: 'demo' + Date.now(), title: 'Новый чат',
+      createdAt: ncTs, updatedAt: ncTs, messages: [] };
+    chats.unshift(nc);
+    return Promise.resolve({ chat: { id: nc.id, title: nc.title,
+      createdAt: nc.createdAt, updatedAt: nc.updatedAt, messageCount: 0 } });
   }
   if (path === '/api/mentor/upload') {
     return Promise.resolve({ imagePath: 'demo.png', size: 1000 });
@@ -1861,14 +1900,27 @@ function demoPost(path, body) {
       '```css\n.product { display: grid; gap: 2rem; }\n@media (min-width: 600px) {\n  .product { grid-template-columns: 1fr 1.2fr; }\n}\n```\n\n' +
       '- [x] Кнопки вместо `div` в галерее\n- [ ] `aria-label` у всех инпутов\n- [ ] Перевести `px` → `rem` в product.css\n\n' +
       '> Оценка за сегодня: **5/10**. Вопрос: что должно происходить с миниатюрами на мобильном?';
+    var chat = demoChats().find(function (c) { return c.id === body.chatId; });
+    if (!chat) {
+      chat = { id: body.chatId || ('demo' + Date.now()), title: 'Новый чат',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        messages: [] };
+      demoChats().unshift(chat);
+    }
+    if (chat.title === 'Новый чат' && body.content) {
+      chat.title = String(body.content).slice(0, 48);
+    }
+    var um = { id: 'u' + Date.now(), role: 'user',
+      content: body.content || '(без текста)',
+      imagePath: body.imagePath ? 'layouts/demo.png' : '',
+      imageNote: body.imagePath ? 'Демо: макет — страница товара, шапка, галерея слева, карточка покупки справа.' : '',
+      createdAt: new Date().toISOString() };
+    var am = { id: 'a' + Date.now(), role: 'assistant', content: reply2,
+      model: 'nemotron-3-ultra', provider: 'demo', createdAt: new Date().toISOString() };
+    chat.messages.push(um, am);
+    chat.updatedAt = am.createdAt;
     return Promise.resolve({
-      userMessage: { id: 'u' + Date.now(), role: 'user',
-        content: body.content || '(без текста)',
-        imagePath: body.imagePath ? 'layouts/demo.png' : '',
-        imageNote: body.imagePath ? 'Демо: макет — страница товара, шапка, галерея слева, карточка покупки справа.' : '',
-        createdAt: new Date().toISOString() },
-      assistantMessage: { id: 'a' + Date.now(), role: 'assistant', content: reply2,
-        model: 'nemotron-3-ultra', provider: 'demo', createdAt: new Date().toISOString() },
+      userMessage: um, assistantMessage: am,
       noteSaved: !!(body.content && /запомни/i.test(body.content)),
       journalSaved: false, planSaved: false });
   }
@@ -2189,9 +2241,17 @@ function demoData(path) {
   }
   if (p === '/api/mentor/chats') {
     if (qs.id) {
-      return { chat: { id: qs.id, title: 'Разбор страницы товара' }, messages: [] };
+      var fc = demoChats().find(function (c) { return c.id === qs.id; });
+      if (fc) {
+        return { chat: { id: fc.id, title: fc.title, updatedAt: fc.updatedAt },
+                 messages: fc.messages };
+      }
+      return { chat: { id: qs.id, title: 'Чат' }, messages: [] };
     }
-    return { chats: [{ id: 'demo1', title: 'Разбор страницы товара', updatedAt: new Date().toISOString(), messageCount: 4 }] };
+    var dlist = demoChats().slice().sort(function (a, b) {
+      return String(b.updatedAt).localeCompare(String(a.updatedAt));
+    }).map(demoChatMeta);
+    return { chats: dlist };
   }
   if (p === '/api/mentor/journal') {
     return { content: '# Журнал прогресса\n\n(в демо пусто — в приложении здесь будут итоги каждой сессии)',
@@ -2212,16 +2272,16 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: 'ivanov/CodeTime',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '2.4.0' };
+             version: '2.4.1' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '2.4.0', latest: '2.4.0',
-             tagName: 'v2.4.0', available: false,
+    return { configured: true, current: '2.4.1', latest: '2.4.1',
+             tagName: 'v2.4.1', available: false,
              assetName: 'CodeTime.exe', assetSize: 22048000,
-             releaseUrl: '#', notes: 'Новый дизайн всего приложения в стиле эталона: сайдбар-навигация, топбар с заголовком раздела, аватар наставника у каждого ответа и приветствие в чате; AI-команда на бесплатных моделях OpenRouter с конвейером; всё остальное работает как раньше' };
+             releaseUrl: '#', notes: 'Исправлен чат наставника: разовый сбой сети больше не подменял данные демо-режимом (застревал один чат, новый не создавался); кнопка «+ Новый чат» и отправка работают устойчиво' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '2.4.0', releases: demoReleases() };
+    return { configured: true, current: '2.4.1', releases: demoReleases() };
   }
   return undefined;
 }
@@ -4320,6 +4380,9 @@ function chatCreate() {
   apiPost('/api/mentor/chats', {}).then(function (d) {
     NM.chatId = d.chat.id;
     NM.msgs = [];
+    // v2.4.1: заголовок тоже сбрасываем — раньше сверху оставалось имя
+    // старого чата и казалось, что открылся тот же чат
+    document.getElementById('chatTitle').textContent = d.chat.title || 'Новый чат';
     return chatRefreshList();
   }).then(function () { chatRenderMsgs(); })
     .catch(function (e) { showToast('Не создать чат: ' + e.message); });
@@ -4400,6 +4463,22 @@ function chatRenderMsgs() {
 }
 
 function chatSend() {
+  if (NM.chatBusy) return;
+  // v2.4.1: если чат ещё не создан/не открыт — создаём и отправляем в него,
+  // а не молча игнорируем ввод
+  if (!NM.chatId) {
+    apiPost('/api/mentor/chats', {}).then(function (d) {
+      NM.chatId = d.chat.id;
+      NM.msgs = [];
+      return chatRefreshList();
+    }).then(function () { chatRenderMsgs(); chatSend(); })
+      .catch(function (e) { showToast('Не создать чат: ' + e.message); });
+    return;
+  }
+  chatSendDo();
+}
+
+function chatSendDo() {
   if (NM.chatBusy || !NM.chatId) return;
   var inp = document.getElementById('chatInput');
   var text = inp.value.trim();
@@ -4433,7 +4512,11 @@ function chatSend() {
     NM.msgs = NM.msgs.filter(function (m) { return m !== local; });
     NM.msgs.push(d.userMessage, d.assistantMessage);
     chatRenderMsgs();
-    chatRefreshList();
+    chatRefreshList().then(function () {
+      // v2.4.1: шапка догоняет авто-заголовок (первая фраза → имя чата)
+      var meta = NM.chats.find(function (c) { return c.id === NM.chatId; });
+      if (meta) document.getElementById('chatTitle').textContent = meta.title || 'Чат';
+    });
     if (d.noteSaved) showToast('🧠 Запомнил — сохранил в заметки');
     if (d.journalSaved) showToast('📓 Журнал обновлён');
     if (d.planSaved) showToast('🗺 План обновлён');
@@ -4934,10 +5017,33 @@ function refresh() {
   else if (state.tab === 'settings') loadSettings();
 }
 
-// первичная инициализация: открываем «Команду»; трекер лениво при входе
+// ---------- пробник соединения (v2.4.1) ----------
+// Демо-режим включаем ТОЛЬКО если сервера нет вовсе (статический
+// предпросмотр дизайна). Разовые сбои и HTTP-ошибки живого сервера
+// не выключают приложение — раньше один неудачный GET навсегда
+// подменял все данные демо-заглушками (в чате «застревал» один чат).
+
+function bootProbe(attempt) {
+  attempt = attempt || 0;
+  return fetch('/api/settings', { cache: 'no-store' }).then(function (r) {
+    if (r.ok) return;
+    throw { http: true };   // сервер отвечает, но с ошибкой — это не «нет сервера»
+  }).catch(function (e) {
+    if (e && e.http) return;
+    if (attempt < 2) {
+      return new Promise(function (res) { setTimeout(res, 900); })
+        .then(function () { return bootProbe(attempt + 1); });
+    }
+    enableDemo();           // сервер недоступен вовсе → статический предпросмотр
+  });
+}
+
+// первичная инициализация: пробник → открываем «Команду»; трекер лениво при входе
 renderPdrops();
-loadSettings();          // версия в подвале и настройки апдейтера
-navSwitch('team');
+bootProbe().then(function () {
+  loadSettings();          // версия в подвале и настройки апдейтера
+  navSwitch('team');
+});
 setInterval(refresh, 30000); // автообновление каждые 30 секунд
 </script>
 </body>
