@@ -801,17 +801,19 @@
 
     <div class="m-pane" id="m-pane-settings">
       <div class="card">
-        <h3>ИИ-подключение (любой OpenAI-совместимый API)</h3>
+        <h3>ИИ-подключение (без ключей / GitHub / свой ключ)</h3>
+        <div class="m-statusline" id="mModeOut"></div>
         <div class="m-fld"><span>Провайдер — подставит адрес и модели, можно поменять</span>
           <select class="inp" id="mPreset" style="max-width:420px">
             <option value="">— выберите —</option>
+            <option value="github">GitHub Models — БЕСПЛАТНО по вашему GitHub-токену (с фото)</option>
             <option value="zai">Z.ai (GLM-4.6, дешёвый и быстрый)</option>
             <option value="openrouter">OpenRouter (много моделей, есть бесплатные)</option>
             <option value="vsegpt">VseGPT (оплата картами РФ)</option>
             <option value="custom">Другой OpenAI-совместимый</option>
           </select></div>
         <div class="m-fld"><span>Адрес API (base URL)</span>
-          <input class="inp" id="mBase" type="text" placeholder="https://api.z.ai/api/paas/v4"></div>
+          <input class="inp" id="mBase" type="text" placeholder="https://models.github.ai/inference"></div>
         <div class="m-fld"><span>Ключ API (пусто = оставить прежний)</span>
           <input class="inp" id="mKey" type="password" placeholder="sk-… / вставьте ключ"></div>
         <div class="m-fld"><span>Модель для текста</span>
@@ -829,7 +831,7 @@
         <h3>GitHub — доступ к вашему репозиторию с вёрсткой</h3>
         <div class="m-fld"><span>Репозиторий (owner/имя)</span>
           <input class="inp" id="mRepo" type="text" placeholder="Fankor70/my-shop"></div>
-        <div class="m-fld"><span>Токен GitHub — только чтение (пусто = оставить прежний)</span>
+        <div class="m-fld"><span>Токен GitHub — Contents: Read + Models: Read (пусто = оставить прежний)</span>
           <input class="inp" id="mToken" type="password" placeholder="github_pat_…"></div>
         <details style="margin-bottom:12px">
           <summary style="cursor:pointer;color:var(--muted);font-size:13px">Как создать токен (2 минуты, только чтение)</summary>
@@ -837,8 +839,9 @@
             <li>Откройте на GitHub: <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</b>.</li>
             <li>Имя: <code>codetime-mentor</code>, срок: 90 дней.</li>
             <li><b>Repository access</b> → «Only select repositories» → выберите репозиторий с вёрсткой (приватный подойдёт).</li>
-            <li><b>Permissions → Repository permissions → Contents: Read-only</b> (Metadata включится сам). Больше ничего не давайте.</li>
-            <li>Generate → скопируйте токен <code>github_pat_…</code> → вставьте выше → «Сохранить».</li>
+            <li><b>Permissions → Repository permissions → Contents: Read-only</b> (Metadata включится сам).</li>
+            <li>Там же в <b>Account permissions</b> включите <b>Models: Read-only</b> — это право открывает бесплатный ИИ (GitHub Models, gpt-4.1-mini): наставник начнёт видеть фото макетов и уйдут лимиты демо-режима.</li>
+            <li>Generate → скопируйте токен <code>github_pat_…</code> → вставьте выше → «Сохранить». Один этот токен даёт и чтение репозитория, и бесплатный ИИ.</li>
           </ol>
         </details>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1118,12 +1121,14 @@ function demoPost(path, body) {
     return Promise.resolve({ reply: reply, journalSaved: false });
   }
   if (path === '/api/mentor/config') {
-    return Promise.resolve({ folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: true,
+    return Promise.resolve({ folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: !!(body.apiKey && body.apiBase),
+      mode: body.apiKey ? 'key' : (body.ghToken ? 'github' : 'demo'),
+      demoModel: 'openai-fast', ghModelsModel: 'openai/gpt-4.1-mini',
       apiBase: body.apiBase || '', model: body.model || '', visionModel: body.visionModel || '',
       hasKey: !!(body.apiKey || ''), hasGhToken: !!(body.ghToken || ''), repo: body.repo || '',
       rolePresent: true, journalPresent: true, ghSnapshot: false });
   }
-  if (path === '/api/mentor/test-llm') return Promise.resolve({ ok: true, via: 'models', models: ['glm-4.6', 'glm-4.5v'] });
+  if (path === '/api/mentor/test-llm') return Promise.resolve({ ok: true, via: 'chat', mode: 'demo', model: 'openai-fast', models: [] });
   if (path === '/api/mentor/test-github') return Promise.resolve({ ok: true, fullName: 'Fankor70/product-page', private: true, defaultBranch: 'main' });
   if (path === '/api/mentor/github-collect') return Promise.resolve({ ok: true, repo: 'Fankor70/product-page', branch: 'main', files: 12, commits: 8, ts: new Date().toISOString(), summary: 'Репозиторий Fankor70/product-page: 12 файлов, 8 последних коммитов. Теперь наставник видит структуру — попросите «проверь мой код, файлы: путь/к/файлу».' });
   if (path === '/api/mentor/memory-save') return Promise.resolve({ ok: true, saved: Object.keys(body) });
@@ -1368,7 +1373,8 @@ function demoData(path) {
   }
   if (p === '/api/roadmap') return demoRoadmap();
   if (p === '/api/mentor/status') {
-    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: false,
+    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: false, mode: 'demo',
+             demoModel: 'openai-fast', ghModelsModel: 'openai/gpt-4.1-mini',
              apiBase: '', model: '', visionModel: '',
              hasKey: false, hasGhToken: false, repo: '',
              rolePresent: true, journalPresent: true, ghSnapshot: false };
@@ -1388,13 +1394,13 @@ function demoData(path) {
              version: '1.9.0' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '1.8.3', latest: '1.9.0',
-             tagName: 'v1.9.0', available: true,
-             assetName: 'CodeTime.exe', assetSize: 22001234,
-             releaseUrl: '#', notes: 'Добавлен Наставник — ИИ-помощник по фронтенду: чат, разбор макетов по фото, память в папке на ПК, чтение GitHub-репозитория, вкладка План' };
+    return { configured: true, current: '1.9.0', latest: '1.9.1',
+             tagName: 'v1.9.1', available: true,
+             assetName: 'CodeTime.exe', assetSize: 22010000,
+             releaseUrl: '#', notes: 'ИИ работает сразу, без ключей: демо-режим на бесплатной модели + GitHub Models по одному токену (с разбором фото)' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '1.8.3', releases: demoReleases() };
+    return { configured: true, current: '1.9.0', releases: demoReleases() };
   }
   return undefined;
 }
@@ -2730,11 +2736,11 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
+    { tag: 'v1.9.1', version: '1.9.1', date: '2026-10-04', assetSize: 22010000,
+      notes: 'ИИ работает сразу, без ключей: демо-режим на бесплатной модели + GitHub Models по одному токену (с разбором фото). Мастер настройки упрощён.',
+      relation: 'newer' },
     { tag: 'v1.9.0', version: '1.9.0', date: '2026-10-04', assetSize: 22001234,
       notes: 'Наставник — ИИ-помощник по фронтенду: чат с любым OpenAI-совместимым API, разбор макетов по фото, память в папке на ПК (journal.md), чтение GitHub-репозитория, вкладка План.',
-      relation: 'newer' },
-    { tag: 'v1.8.3', version: '1.8.3', date: '2026-10-04', assetSize: 21797803,
-      notes: 'Восстановлен интерфейс дашборда; CI-предохранитель: сборка падает, если dashboard.html повреждён.',
       relation: 'current' },
     { tag: 'v1.8.2', version: '1.8.2', date: '2026-10-04', assetSize: 21764741,
       notes: 'Самотест новой версии перед установкой — обновление больше не может сломать приложение.',
@@ -2757,7 +2763,7 @@ function loadReleases(silent) {
     RELEASES = demoReleases();
     fillReleases('1.9.0');
     demoLockInstall();
-    $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.9.0</b> (демо). ' +
+    $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.9.1</b> (демо). ' +
       'В предпросмотре установка недоступна — запустите приложение CodeTime.';
     return;
   }
@@ -2871,6 +2877,7 @@ var M_MODE_HINT = {
 };
 
 var M_PRESETS = {
+  github:     { base: 'https://models.github.ai/inference', model: 'openai/gpt-4.1-mini', vision: 'openai/gpt-4.1-mini' },
   zai:        { base: 'https://api.z.ai/api/paas/v4', model: 'glm-4.6', vision: 'glm-4.5v' },
   openrouter: { base: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.5-flash', vision: 'google/gemini-2.5-flash' },
   vsegpt:     { base: 'https://api.vsegpt.ru/v1', model: 'openai/gpt-4o-mini', vision: 'openai/gpt-4o-mini' },
@@ -2897,14 +2904,24 @@ function mentorInit() {
   mentorPane('chat');
 }
 
+function mentorModeLabel(s) {
+  if (s.mode === 'key') {
+    return 'Модель: ' + (s.model || 'не задана') + (s.repo ? ' · GitHub: ' + s.repo : '');
+  }
+  if (s.mode === 'github') {
+    return 'GitHub Models: ' + (s.model || s.ghModelsModel || 'openai/gpt-4.1-mini') +
+      ' (бесплатно, с фото)' + (s.repo ? ' · GitHub: ' + s.repo : '');
+  }
+  return 'Демо-ИИ: ' + (s.demoModel || 'openai-fast') +
+    ' — бесплатно и без ключей (фото макетов — после GitHub-токена)';
+}
+
 function mentorLoadStatus() {
   api('/api/mentor/status').then(function (s) {
     M.status = s;
     mentorRenderWizard();
     var lbl = $('mentorModelLbl');
-    if (lbl) lbl.textContent = s.configured
-      ? 'Модель: ' + (s.model || 'не задана') + (s.repo ? ' · GitHub: ' + s.repo : '')
-      : 'ИИ не подключён — заполните Настройки';
+    if (lbl) lbl.textContent = mentorModeLabel(s);
   }).catch(function (e) {
     showToast('Наставник: ' + e.message);
   });
@@ -2914,31 +2931,50 @@ function mentorRenderWizard() {
   var w = $('mentorWizard');
   if (!w) return;
   var s = M.status || {};
+  try {
+    if (localStorage.getItem('mentorWizDone') === '1') {
+      w.hidden = true; w.innerHTML = ''; return;
+    }
+  } catch (e) { /* приватный режим — просто показываем */ }
   var steps = [];
-  if (!s.configured) {
-    steps.push('<div class="m-step"><b>Шаг 1 — подключить ИИ (2 минуты)</b>' +
-      '<ol><li><b>Z.ai</b> — <a href="https://z.ai" target="_blank" rel="noopener">z.ai</a> → регистрация → консоль → API Keys → Create. Модели: <code>glm-4.6</code>, для фото <code>glm-4.5v</code>.</li>' +
-      '<li><b>OpenRouter</b> — <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> → Create Key. Модель: например <code>google/gemini-2.5-flash</code>.</li>' +
-      '<li><b>VseGPT</b> (оплата картами РФ) — <a href="https://vsegpt.ru" target="_blank" rel="noopener">vsegpt.ru</a> → Кабинет → Ключи.</li></ol>' +
-      'Скопируйте ключ → «Настройки» → «Ключ API» → Сохранить → Проверить.' +
-      '<div class="m-wz-actions"><button class="btn wz-go-settings" style="padding:8px 16px">Открыть настройки</button></div></div>');
+  if (s.mode !== 'key') {
+    steps.push('<div class="m-step"><b>ИИ уже работает — бесплатно и без всяких ключей</b>' +
+      '<p style="margin:6px 0">Это демо-модель <code>' + esc(s.demoModel || 'openai-fast') +
+      '</code>: код и текст разбирает, лимит общий с другими пользователями. ' +
+      'Для разбора фото макетов подключите бесплатный ИИ по GitHub-токену (шаг ниже) — ' +
+      'тот же токен даст и чтение вашего репозитория.</p>' +
+      '<div class="m-wz-actions">' +
+      '<button class="btn wz-demo" style="padding:8px 16px">Писать в демо-режиме</button>' +
+      '<button class="btn btn-ghost wz-go-settings" style="padding:8px 16px">Настроить GitHub-ИИ</button>' +
+      '</div></div>');
   }
   if (!s.hasGhToken) {
-    steps.push('<div class="m-step"><b>Шаг 2 — доступ к вашему GitHub</b> (нужно, чтобы наставник читал код из репозитория; можно пропустить)' +
+    steps.push('<div class="m-step"><b>Шаг — GitHub-токен: фото макетов + чтение вашего кода + ИИ без лимитов демо</b>' +
       '<ol><li>GitHub: <b>Settings → Developer settings → Personal access tokens → Fine-grained → Generate new token</b>.</li>' +
-      '<li>Имя <code>codetime-mentor</code>, срок 90 дней.</li>' +
-      '<li>Repository access → «Only select repositories» → выберите репозиторий с вёрсткой (приватный подойдёт).</li>' +
-      '<li>Permissions → Contents: <b>Read-only</b> — больше ничего.</li>' +
-      '<li>Generate → скопируйте <code>github_pat_…</code> → Настройки → «Токен GitHub» → Сохранить.</li></ol>' +
+      '<li>Имя <code>codetime-mentor</code>, срок 90 дней; Repository access → только ваш репозиторий с вёрсткой.</li>' +
+      '<li>Permissions: Repository → Contents: <b>Read-only</b>; Account → Models: <b>Read-only</b> (это бесплатный ИИ gpt-4.1-mini).</li>' +
+      '<li>Generate → скопируйте <code>github_pat_…</code> → Настройки Наставника → «Токен GitHub» → Сохранить.</li></ol>' +
       '<div class="m-wz-actions"><button class="btn wz-go-settings" style="padding:8px 16px">Открыть настройки</button></div></div>');
   }
   if (!steps.length) { w.hidden = true; w.innerHTML = ''; return; }
   w.hidden = false;
-  w.innerHTML = '<h4>🚀 Первая настройка Наставника</h4>' + steps.join('');
+  w.innerHTML = '<h4>🚀 Настройка Наставника (можно пропустить — демо уже включено)</h4>' + steps.join('');
 }
+
+// под-вкладки Наставника: Чат / План / Журнал / Настройки
+$('mentorSubtabs').addEventListener('click', function (e) {
+  var b = e.target.closest('.m-subtab');
+  if (b) mentorPane(b.dataset.mt);
+});
 
 // делегирование кнопок мастера (они перерисовываются)
 $('mentorWizard').addEventListener('click', function (e) {
+  if (e.target.closest('.wz-demo')) {
+    try { localStorage.setItem('mentorWizDone', '1'); } catch (err) {}
+    $('mentorWizard').hidden = true;
+    showToast('Демо-ИИ включён — пишите прямо в чат. Фото макетов: подключите GitHub-токен в Настройках (бесплатно).');
+    return;
+  }
   if (e.target.closest('.wz-go-settings')) mentorPane('settings');
 });
 
@@ -2985,9 +3021,10 @@ function mentorSend(mode) {
   var hint = (mode && M_MODE_HINT[mode]) || '';
   if (!text && !M.attach && !hint) return;
   var s = M.status || {};
-  if (!s.configured && !DEMO) {
-    mentorPane('settings');
-    showToast('Сначала подключите ИИ: настройки Наставника, шаг 1');
+  if (DEMO) {
+    // предпросмотр файла — заготовленный ответ подставит demoPost
+  } else if (s.mode === 'demo' && M.attach) {
+    showToast('Фото в демо-режиме не разобрать — подключите GitHub-токен в Настройках (бесплатно, 2 минуты)');
     return;
   }
   M.msgs.push({ role: 'user', text: text || hint, img: M.attach ? M.attach.dataUrl : null });
@@ -3073,6 +3110,16 @@ function mentorFillSettings() {
   $('mVision').value = s.visionModel || '';
   $('mRepo').value = s.repo || '';
   $('mFolder').textContent = s.folder || (M.memory && M.memory.folder) || '…';
+  var mo = $('mModeOut');
+  if (mo) {
+    if (s.mode === 'key') {
+      mo.innerHTML = '<span class="m-ok">Сейчас: свой ключ' + (s.model ? ' · ' + esc(s.model) : '') + '</span>';
+    } else if (s.mode === 'github') {
+      mo.innerHTML = '<span class="m-ok">Сейчас: GitHub Models — бесплатно по GitHub-токену' + (s.model || s.ghModelsModel ? ' · ' + esc(s.model || s.ghModelsModel) : '') + '</span>';
+    } else {
+      mo.innerHTML = '<span class="m-ok">Сейчас: демо-ИИ без ключей · ' + esc(s.demoModel || 'openai-fast') + ' (фото — после GitHub-токена)</span>';
+    }
+  }
 }
 
 function mentorSaveAll() {
@@ -3089,9 +3136,7 @@ function mentorSaveAll() {
     mentorRenderWizard();
     mentorFillSettings();
     var lbl = $('mentorModelLbl');
-    if (lbl) lbl.textContent = st.configured
-      ? 'Модель: ' + (st.model || 'не задана') + (st.repo ? ' · GitHub: ' + st.repo : '')
-      : 'ИИ не подключён — заполните Настройки';
+    if (lbl) lbl.textContent = mentorModeLabel(st);
     return st;
   });
 }
@@ -3114,9 +3159,15 @@ $('mTestLlm').addEventListener('click', function () {
   mentorSaveAll().then(function () {
     return apiPost('/api/mentor/test-llm', {});
   }).then(function (r) {
-    out.innerHTML = '<span class="m-ok">✓ Ключ работает' +
-      (r.models && r.models.length
-        ? '. Доступные модели: ' + esc(r.models.slice(0, 8).join(', ')) : '') + '</span>';
+    if (r.mode === 'demo') {
+      out.innerHTML = '<span class="m-ok">✓ Демо-ИИ отвечает (' + esc(r.model || 'openai-fast') + ') — бесплатно, без ключей. Для фото макетов подключите GitHub-токен.</span>';
+    } else if (r.mode === 'github') {
+      out.innerHTML = '<span class="m-ok">✓ GitHub Models отвечает (' + esc(r.model || 'openai/gpt-4.1-mini') + ') — бесплатно по вашему токену</span>';
+    } else {
+      out.innerHTML = '<span class="m-ok">✓ Ключ работает' +
+        (r.models && r.models.length
+          ? '. Доступные модели: ' + esc(r.models.slice(0, 8).join(', ')) : '') + '</span>';
+    }
   }).catch(function (e) {
     out.innerHTML = '<span class="m-bad">✗ ' + esc(e.message) + '</span>';
   });

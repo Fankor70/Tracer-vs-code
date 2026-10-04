@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""CodeTime Наставник — встроенный ИИ-помощник по фронтенду (v1.9.0).
+"""CodeTime Наставник — встроенный ИИ-помощник по фронтенду (v1.9.1).
 
 Всё состояние хранится в ОБЫЧНОЙ ПАПКЕ на ПК пользователя:
   %USERPROFILE%\\CodeTimeMentor\\
@@ -11,15 +11,21 @@
     layouts/      — присланные фото макетов
 
 Наставник сам создаёт эту папку при первом запуске («сам поднимет всё,
-что ему нужно»). От пользователя нужны только два ключа: ИИ-API и GitHub
-(инструкции показывает мастер в интерфейсе).
+что ему нужно»). Вставлять ключи НЕ обязательно — работают 3 режима:
+  1. ДЕМО (без всяких ключей) — бесплатная публичная модель Pollinations
+     openai-fast (GPT-OSS 20B); текст и код, лимит ~1 запрос/3 сек;
+  2. GITHUB (один бесплатный токен GitHub: Contents: Read + Models: Read) —
+     и репозиторий читает, и полноценный ИИ GitHub Models
+     openai/gpt-4.1-mini с разбором фото макетов;
+  3. СВОЙ КЛЮЧ — любой OpenAI-совместимый API (Z.ai, OpenRouter, VseGPT…).
+Режим выбирается автоматически: свой ключ > GitHub-токен > демо.
 
 API (обслуживается локальным сервером CodeTime, порт 5731):
   GET  /api/mentor/status   — состояние настройки (что уже подключено)
   GET  /api/mentor/memory   — journal.md / plan.md / role.txt
   GET  /api/mentor/history  — переписка за день (по умолчанию сегодня)
   POST /api/mentor/config         — сохранить настройки подключения
-  POST /api/mentor/test-llm       — проверить ключ ИИ
+  POST /api/mentor/test-llm       — проверить ИИ (ключ / GitHub / демо)
   POST /api/mentor/test-github    — проверить токен GitHub
   POST /api/mentor/chat           — отправить сообщение (+фото макета)
   POST /api/mentor/memory-save    — записать journal/plan/role целиком
@@ -38,6 +44,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
@@ -60,9 +67,24 @@ DEFAULT_CONFIG = {
     'api_key': '',
     'model': '',          # текстовая модель, например glm-4.6
     'vision_model': '',   # модель для фото макетов, например glm-4.5v
-    'gh_token': '',       # fine-grained PAT с правом только читать
+    'gh_token': '',       # fine-grained PAT: Contents: Read + Models: Read
     'repo': '',           # owner/name репозитория с вёрсткой
 }
+
+# --- Демо-ИИ: бесплатная публичная модель, вообще БЕЗ ключей (v1.9.1) ---
+# Pollinations, anonymous tier. Параметр referrer обязателен: без него
+# API отвечает 402 Payment Required. 'private' — не показывать запрос
+# в публичной ленте сервиса.
+DEMO_LLM_BASE = 'https://text.pollinations.ai/openai'
+DEMO_LLM_MODEL = 'openai-fast'   # GPT-OSS 20B reasoning, текст без vision
+DEMO_LLM_REFERRER = 'codetime-mentor'
+
+# --- GitHub Models: бесплатный ИИ по обычному токену GitHub ----------
+# Тот же PAT, что для чтения репозитория (право Models: Read), открывает
+# полноценные модели с vision. Если каталог GitHub поменяет имя модели —
+# студент вписывает другое в Настройках.
+GH_MODELS_BASE = 'https://models.github.ai/inference'
+GH_MODELS_MODEL = 'openai/gpt-4.1-mini'
 
 
 class MentorError(ValueError):
@@ -246,9 +268,18 @@ def save_config(patch):
 
 def api_status():
     cfg = load_config()
+    if cfg['api_key'] and cfg['api_base']:
+        mode = 'key'          # свой ключ, любой OpenAI-совместимый API
+    elif cfg['gh_token']:
+        mode = 'github'       # GitHub Models по токену (бесплатно, с vision)
+    else:
+        mode = 'demo'         # демо-ИИ вообще без ключей
     return {
         'folder': MENTOR_DIR,
         'configured': bool(cfg['api_key'] and cfg['api_base']),
+        'mode': mode,
+        'demoModel': DEMO_LLM_MODEL,
+        'ghModelsModel': GH_MODELS_MODEL,
         'apiBase': cfg['api_base'],
         'model': cfg['model'],
         'visionModel': cfg['vision_model'],
@@ -343,7 +374,7 @@ def open_folder():
 
 
 # ============================================================
-# ИИ: OpenAI-совместимый чат
+# ИИ: OpenAI-совместимый чат (3 режима: ключ > GitHub > демо)
 # ============================================================
 
 def _http_json(url, payload=None, headers=None, timeout=180):
@@ -372,28 +403,20 @@ def _http_json(url, payload=None, headers=None, timeout=180):
         raise MentorError('Нет связи с API (%s). Проверьте интернет и адрес.' % e)
 
 
-def llm_chat(messages, model, timeout=240):
-    cfg = load_config()
-    if not cfg['api_key']:
-        raise MentorError('Ключ ИИ не задан — Наставник → Настройки → «Ключ API».')
-    if not cfg['api_base']:
-        raise MentorError('Не указан адрес API — Наставник → Настройки.')
-    if not model:
-        model = cfg['model'] or 'glm-4.6'
-    url = cfg['api_base'].rstrip('/') + '/chat/completions'
-    payload = {
-        'model': model,
-        'messages': messages,
-        'temperature': 0.6,
-        'max_tokens': 4000,
-        'stream': False,
-    }
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + cfg['api_key'],
-        'User-Agent': 'CodeTime-Mentor/' + _ver(),
-    }
-    data = _http_json(url, payload, headers, timeout)
+def _llm_params(cfg, model):
+    """Куда реально стучаться: (base, key, model, mode).
+    Приоритет: свой ключ > GitHub Models по gh-токену > демо-ИИ без ключей."""
+    if cfg['api_key'] and cfg['api_base']:
+        return (cfg['api_base'].rstrip('/'), cfg['api_key'],
+                model or cfg['model'] or '', 'key')
+    if cfg['gh_token']:
+        return (GH_MODELS_BASE, cfg['gh_token'],
+                model or cfg['model'] or GH_MODELS_MODEL, 'github')
+    return (DEMO_LLM_BASE, '', model or DEMO_LLM_MODEL, 'demo')
+
+
+def _parse_content(data):
+    """Достаёт текст из ответа chat/completions (content бывает списком)."""
     try:
         content = data['choices'][0]['message']['content']
     except (KeyError, IndexError, TypeError):
@@ -405,9 +428,61 @@ def llm_chat(messages, model, timeout=240):
             if isinstance(p, dict) and p.get('type') == 'text':
                 parts.append(p.get('text', ''))
         content = '\n'.join(parts)
-    if not (content or '').strip():
+    content = (content or '').strip()
+    if not content:
+        # reasoning-модели иногда отдают весь бюджет размышлениям —
+        # тогда хотя бы вернём сам ход мысли
+        reasoning = ''
+        try:
+            reasoning = (data['choices'][0]['message'].get('reasoning')
+                         or '').strip()
+        except (KeyError, IndexError, TypeError, AttributeError):
+            pass
+        content = reasoning
+    if not content:
         raise MentorError('Модель вернула пустой ответ.')
-    return content.strip()
+    return content
+
+
+def llm_chat(messages, model, timeout=240):
+    cfg = load_config()
+    base, key, model, mode = _llm_params(cfg, model)
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'CodeTime-Mentor/' + _ver(),
+    }
+    if mode == 'demo':
+        # бесплатно и без ключей; referrer обязателен (иначе 402).
+        # ВАЖНО: у анонимного тарифа жёсткий троттлинг по IP — при частых
+        # запросах API отвечает 402, поэтому ждём и повторяем.
+        payload = {'model': model, 'messages': messages,
+                   'max_tokens': 4000, 'stream': False,
+                   'referrer': DEMO_LLM_REFERRER}
+        last_err = None
+        # фолбэк-алиасы модели + паузы против троттлинга (402/429)
+        for m in dict.fromkeys([model, DEMO_LLM_MODEL, 'openai']):
+            for d in (0, 25):
+                if d:
+                    time.sleep(d)
+                try:
+                    data = _http_json(base, dict(payload, model=m),
+                                      headers, timeout)
+                    return _parse_content(data)
+                except MentorError as e:
+                    last_err = e
+                    if '402' not in str(e) and '429' not in str(e):
+                        break  # не троттлинг — пробуем следующую модель
+        if last_err and ('402' in str(last_err) or '429' in str(last_err)):
+            raise MentorError(
+                'Демо-ИИ перегружен (общий бесплатный лимит на всех). '
+                'Подождите 1–2 минуты и повторите — либо подключите '
+                'GitHub-токен или свой ключ в Настройках: там лимиты личные.')
+        raise last_err or MentorError('Демо-ИИ недоступен.')
+    headers['Authorization'] = 'Bearer ' + key
+    payload = {'model': model, 'messages': messages,
+               'temperature': 0.6, 'max_tokens': 4000, 'stream': False}
+    data = _http_json(base + '/chat/completions', payload, headers, timeout)
+    return _parse_content(data)
 
 
 def _ver():
@@ -422,30 +497,39 @@ def _ver():
 
 
 def test_llm():
-    """Быстрая проверка ключа: GET /models, если провайдер его умеет,
-    иначе крошечный chat-запрос."""
+    """Проверка ИИ: показывает, какой режим реально работает
+    (свой ключ / GitHub Models / демо без ключей)."""
     cfg = load_config()
-    if not cfg['api_key'] or not cfg['api_base']:
-        raise MentorError('Сначала заполните «Адрес API» и «Ключ API» и сохраните.')
-    headers = {'Authorization': 'Bearer ' + cfg['api_key'],
-               'User-Agent': 'CodeTime-Mentor'}
-    url = cfg['api_base'].rstrip('/') + '/models'
+    base, key, model, mode = _llm_params(cfg, cfg['model'])
+    headers = {'User-Agent': 'CodeTime-Mentor/' + _ver()}
+    if mode == 'demo':
+        payload = {'model': DEMO_LLM_MODEL,
+                   'messages': [{'role': 'user', 'content': 'ping'}],
+                   'max_tokens': 30, 'stream': False,
+                   'referrer': DEMO_LLM_REFERRER}
+        headers['Content-Type'] = 'application/json'
+        _http_json(base, payload, headers, 60)
+        return {'ok': True, 'via': 'chat', 'mode': 'demo',
+                'model': DEMO_LLM_MODEL, 'models': []}
+    headers['Authorization'] = 'Bearer ' + key
+    url = base + '/models'
     try:
         data = _http_json(url, None, headers, 30)
         ids = sorted({(m.get('id') or '?') for m in data.get('data', [])
                       if isinstance(m, dict)})[:40]
-        return {'ok': True, 'via': 'models', 'models': ids}
+        return {'ok': True, 'via': 'models', 'mode': mode,
+                'model': model, 'models': ids}
     except MentorError as e:
         # /models есть не у всех — пробуем минимальный chat-запрос
         if '404' not in str(e):
             raise
-    payload = {'model': cfg['model'] or 'glm-4.6',
+    payload = {'model': model or 'glm-4.6',
                'messages': [{'role': 'user', 'content': 'ping'}],
                'max_tokens': 5, 'stream': False}
     headers['Content-Type'] = 'application/json'
-    _http_json(cfg['api_base'].rstrip('/') + '/chat/completions',
-               payload, headers, 60)
-    return {'ok': True, 'via': 'chat', 'models': []}
+    _http_json(base + '/chat/completions', payload, headers, 60)
+    return {'ok': True, 'via': 'chat', 'mode': mode,
+            'model': model, 'models': []}
 
 
 # ============================================================
@@ -638,9 +722,13 @@ def api_chat(data):
         raise MentorError('Пустое сообщение.')
 
     cfg = load_config()
-    if not cfg['api_key']:
-        raise MentorError('ИИ ещё не подключён. Наставник → Настройки → ключ API '
-                          '(мастер настройки покажет, где его взять).')
+    _base, _key, _model, llm_mode = _llm_params(cfg, cfg['model'])
+    if img_b64 and llm_mode == 'demo':
+        raise MentorError(
+            'В демо-режиме (без ключей) у модели нет «зрения» — фото макета '
+            'она не увидит. Подключите бесплатный ИИ по GitHub-токену '
+            '(мастер настройки: один токен даст и репозиторий, и '
+            'gpt-4.1-mini с фото) или любой свой ключ в Настройках.')
 
     user_text = MODE_INSTRUCTIONS.get(mode, '')
     user_text = (user_text + '\n\n' + msg).strip() if user_text else msg
