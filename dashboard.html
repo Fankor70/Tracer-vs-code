@@ -688,19 +688,18 @@
 
     <div class="card">
       <h3>Обновление приложения</h3>
-      <div class="set-row">
-        <div class="verline">Текущая версия: <b id="curVersion">…</b></div>
-        <label class="head" style="display:block;font-weight:600;margin:10px 0 6px">GitHub-репозиторий с релизами</label>
-        <div style="display:flex; gap:8px; flex-wrap:wrap">
-          <input class="inp" id="ghRepo" placeholder="например: ivanov/CodeTime" style="flex:1;min-width:200px">
-          <button class="btn btn-ghost" id="ghSaveRepo" style="padding:8px 16px">Сохранить</button>
-        </div>
-        <div class="hint">Приложение смотрит последний <b>Release</b> этого репозитория. Нажмите «Проверить обновления» — если там лежит новый CodeTime.exe, установка будет в один клик.</div>
+      <div class="verline">Текущая версия: <b id="curVersion">…</b></div>
+      <div id="updateStatus" class="hint" style="margin:8px 0 14px"></div>
+      <label class="head" style="display:block;font-weight:600;margin-bottom:6px">Версия для установки <span style="font-weight:400;color:var(--muted)">(все версии живут на GitHub — можно и назад откатиться)</span></label>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+        <select class="inp" id="updSelect" style="flex:1;min-width:240px" disabled>
+          <option>Сначала нажмите «Список версий»</option>
+        </select>
+        <button class="btn" id="installBtn" disabled>⬇ Установить</button>
       </div>
-      <div id="updateStatus" class="hint" style="margin-bottom:12px"></div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
-        <button class="btn" id="checkUpdateBtn">Проверить обновления</button>
-        <button class="btn" id="doUpdateBtn" hidden>⬇ Обновить до <span id="newVersion"></span></button>
+      <div id="updNotes" class="hint" style="margin-top:8px;white-space:pre-line"></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px">
+        <button class="btn btn-ghost" id="checkUpdateBtn">🔄 Список версий</button>
         <button class="btn btn-ghost" id="updateBtn" data-tip="Резервный способ: установить из выбранного файла">Из файла…</button>
         <input type="file" id="updateFile" accept=".exe,application/octet-stream" hidden>
       </div>
@@ -828,7 +827,6 @@ var state = {
   taskItems: [],           // все задачи (грузим с запасом, группы по срокам)
   deleteMode: false,       // режим удаления задач
   selectedIds: [],         // выбранные для удаления id
-  lastUpdate: null         // последний ответ /api/update/check
 };
 
 // ---------- утилиты ----------
@@ -985,10 +983,10 @@ function demoAchievements() {
 
 function demoProjects() {
   var rows = [
-    { project: 'my-landing', activeSec: 148 * 3600, idleSec: 19 * 3600, clicks: 4210, chars: 31200, words: 6100, daysActive: 21, firstDate: '2025-12-21' },
-    { project: 'js-cart', activeSec: 96 * 3600, idleSec: 11 * 3600, clicks: 2840, chars: 19800, words: 4300, daysActive: 14, firstDate: '2026-01-02' },
-    { project: 'CodeTime', activeSec: 51 * 3600, idleSec: 6 * 3600, clicks: 990, chars: 12100, words: 2600, daysActive: 9, firstDate: '2026-01-05' },
-    { project: 'practice-flex', activeSec: 22 * 3600, idleSec: 3 * 3600, clicks: 640, chars: 5400, words: 1100, daysActive: 5, firstDate: '2026-01-09' }
+    { project: 'my-landing', activeSec: 148 * 3600, idleSec: 19 * 3600, clicks: 4210, chars: 31200, words: 6100, daysActive: 21, firstDate: '2025-12-21', lastDate: '2026-01-18' },
+    { project: 'js-cart', activeSec: 96 * 3600, idleSec: 11 * 3600, clicks: 2840, chars: 19800, words: 4300, daysActive: 14, firstDate: '2026-01-02', lastDate: '2026-01-15' },
+    { project: 'CodeTime', activeSec: 51 * 3600, idleSec: 6 * 3600, clicks: 990, chars: 12100, words: 2600, daysActive: 9, firstDate: '2026-01-05', lastDate: '2026-01-19' },
+    { project: 'practice-flex', activeSec: 22 * 3600, idleSec: 3 * 3600, clicks: 640, chars: 5400, words: 1100, daysActive: 5, firstDate: '2026-01-09', lastDate: '2026-01-13' }
   ];
   var total = rows.reduce(function (a, r) { return a + r.activeSec; }, 0) || 1;
   rows.forEach(function (r) { r.share = Math.round(r.activeSec * 1000 / total) / 10; });
@@ -1812,13 +1810,16 @@ function renderProjects(list) {
       '<td class="num">' + fmtNum(p.clicks) + '</td>' +
       '<td class="num">' + fmtNum(p.chars) + '</td>' +
       '<td class="num">' + fmtNum(p.daysActive) + '</td>' +
-      '<td class="num" style="color:var(--muted)">' + esc(p.firstDate) + '</td>' +
+      '<td class="num" style="color:var(--muted)" data-tip="Первый день работы над проектом">' +
+      (p.firstDate ? fmtDateShort(p.firstDate) : '—') + '</td>' +
+      '<td class="num" style="color:var(--muted)" data-tip="Последний день работы над проектом">' +
+      (p.lastDate ? fmtDateShort(p.lastDate) : '—') + '</td>' +
       '</tr>';
   }).join('');
   $('projectsList').innerHTML =
     '<div style="overflow-x:auto"><table class="list"><thead><tr>' +
     '<th>Проект</th><th>Активно</th><th>Пауза</th><th>Доля</th>' +
-    '<th>Клики</th><th>Символы</th><th>Дней</th><th>С</th>' +
+    '<th>Клики</th><th>Символы</th><th>Дней</th><th>Активен с</th><th>по</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
@@ -2299,7 +2300,6 @@ function renderSettings(s) {
   $('trackClicks').checked = !!s.trackClicks;
   $('trackKeys').checked = !!s.trackKeys;
   $('autostart').checked = !!s.autostart;
-  if (document.activeElement !== $('ghRepo')) $('ghRepo').value = s.githubRepo || '';
   $('dbPath').textContent = s.dbPath || '';
   $('curVersion').textContent = s.version || '—';
 }
@@ -2322,8 +2322,7 @@ $('saveBtn').addEventListener('click', function () {
     dailyGoalMin: parseInt($('dailyGoalMin').value, 10),
     trackClicks: $('trackClicks').checked,
     trackKeys: $('trackKeys').checked,
-    autostart: $('autostart').checked,
-    githubRepo: ($('ghRepo').value || '').trim()
+    autostart: $('autostart').checked
   };
   $('saveStatus').textContent = 'Сохранение…';
   fetch('/api/settings', {
@@ -2415,89 +2414,139 @@ $('updateFile').addEventListener('change', function () {
   });
 });
 
-// ---------- обновление через GitHub Releases ----------
+// ---------- обновление через GitHub Releases: все версии + откат ----------
 
-$('ghSaveRepo').addEventListener('click', function () {
-  var repo = ($('ghRepo').value || '').trim();
-  if (repo && repo.split('/').filter(Boolean).length !== 2) {
-    showToast('Формат: имя_пользователя/имя_репозитория');
-    return;
-  }
-  apiPost('/api/settings', { githubRepo: repo }).then(function () {
-    showToast(repo ? 'Репозиторий сохранён: ' + repo : 'Репозиторий очищен');
-  }).catch(function (err) { showToast(err.message); });
-});
+var RELEASES = [];   // список релизов с GitHub (новые сверху)
 
-$('checkUpdateBtn').addEventListener('click', checkUpdates);
-
-function checkUpdates() {
-  if (DEMO) {
-    state.lastUpdate = { configured: true, current: '1.6.0', latest: '1.6.1',
-      available: true, assetUrl: '#', assetSize: 18943232 };
-  } else {
-    var st = $('updateStatus');
-    st.innerHTML = '<span class="spinner"></span>Проверяю последний релиз на GitHub…';
-    $('doUpdateBtn').hidden = true;
-    api('/api/update/check').then(function (d) {
-      if (d.configured === false) {
-        st.textContent = 'Сначала укажите репозиторий выше (например: ivanov/CodeTime) и нажмите «Сохранить».';
-        return;
-      }
-      if (d.error) {
-        st.textContent = 'Не удалось связаться с GitHub: ' + d.error;
-        return;
-      }
-      state.lastUpdate = d;
-      if (d.available) {
-        $('newVersion').textContent = 'v' + d.latest;
-        $('doUpdateBtn').hidden = false;
-        st.innerHTML = 'Доступна версия <b>v' + esc(d.latest) + '</b> (у вас v' +
-          esc(d.current) + ')' +
-          (d.assetSize ? ' · размер ' + Math.round(d.assetSize / 1048576) + ' МБ' : '') +
-          (d.notes ? '<br>' + esc(String(d.notes).slice(0, 160)) : '');
-      } else {
-        st.textContent = 'У вас последняя версия ✓ (v' + esc(d.current) + ')';
-      }
-    }).catch(function () {
-      st.textContent = 'GitHub недоступен — проверьте интернет.';
-    });
-    return;
-  }
-  var d = state.lastUpdate;
-  $('newVersion').textContent = 'v' + d.latest;
-  $('doUpdateBtn').hidden = false;
-  $('updateStatus').innerHTML = 'Доступна версия <b>v' + esc(d.latest) +
-    '</b> (демо) · размер ' + Math.round(d.assetSize / 1048576) + ' МБ';
+function relLabel(r) {
+  var mark = r.relation === 'newer' ? '⬆ доступно обновление'
+    : r.relation === 'current' ? '✓ установлена сейчас'
+    : '⬇ откат назад';
+  return 'v' + r.version +
+    (r.date ? ' · ' + r.date : '') +
+    (r.assetSize ? ' · ' + Math.round(r.assetSize / 1048576) + ' МБ' : '') +
+    ' — ' + mark;
 }
 
-$('doUpdateBtn').addEventListener('click', function () {
-  var d = state.lastUpdate;
-  if (!d || !d.assetUrl) { showToast('Сначала нажмите «Проверить обновления»'); return; }
+function renderRelNotes() {
+  var r = RELEASES[$('updSelect').value];
+  $('updNotes').textContent = r ? (r.notes || 'Без описания.') : '';
+}
+
+function fillReleases(preferVer) {
+  var sel = $('updSelect');
+  if (!RELEASES.length) {
+    sel.innerHTML = '<option>На GitHub пока нет релизов</option>';
+    sel.disabled = true;
+    $('installBtn').disabled = true;
+    return;
+  }
+  sel.innerHTML = RELEASES.map(function (r, i) {
+    return '<option value="' + i + '">' + esc(relLabel(r)) + '</option>';
+  }).join('');
+  sel.disabled = false;
+  var idx = 0;
+  if (preferVer) {
+    for (var i = 0; i < RELEASES.length; i++) {
+      if (RELEASES[i].version === preferVer) { idx = i; break; }
+    }
+  }
+  sel.value = String(idx);
+  $('installBtn').disabled = false;
+  renderRelNotes();
+}
+
+function loadReleases(silent) {
+  if (DEMO) {
+    RELEASES = [
+      { tag: 'v1.8.0', version: '1.8.0', date: '2026-10-04', assetSize: 21 * 1048576,
+        notes: 'Выбор любой версии и откат; новый надёжный установщик; Проекты: период работы.',
+        relation: 'newer' },
+      { tag: 'v1.7.0', version: '1.7.0', date: '2026-10-03', assetSize: 21 * 1048576,
+        notes: 'План: время и статус закреплены за шагом.', relation: 'older' },
+      { tag: 'v1.6.0', version: '1.6.0', date: '2026-10-02', assetSize: 20 * 1048576,
+        notes: 'План синхронизирован с активным временем.', relation: 'older' }
+    ];
+    fillReleases('1.8.0');
+    $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.8.0</b> (демо).';
+    return;
+  }
+  var st = $('updateStatus');
+  if (!silent) st.innerHTML = '<span class="spinner"></span>Загружаю список версий с GitHub…';
+  api('/api/update/releases').then(function (d) {
+    if (d.configured === false) {
+      st.textContent = 'Репозиторий обновлений не задан — напишите разработчику.';
+      return;
+    }
+    if (d.error) {
+      st.textContent = 'Не удалось связаться с GitHub: ' + d.error;
+      return;
+    }
+    RELEASES = d.releases || [];
+    var newest = null;
+    for (var i = 0; i < RELEASES.length; i++) {
+      if (RELEASES[i].relation === 'newer') { newest = RELEASES[i]; break; }
+    }
+    fillReleases(newest ? newest.version : null);
+    if (newest) {
+      st.innerHTML = 'Доступна новая версия <b>v' + esc(newest.version) + '</b> (у вас v' +
+        esc(d.current) + '). Она уже выбрана в списке — нажмите «Установить».';
+    } else {
+      st.textContent = 'У вас последняя версия ✓ (v' + esc(d.current) +
+        '). Все выпущенные версии — в списке, можно откатиться назад.';
+    }
+  }).catch(function () {
+    st.textContent = 'GitHub недоступен — проверьте интернет.';
+  });
+}
+
+$('updSelect').addEventListener('change', renderRelNotes);
+$('checkUpdateBtn').addEventListener('click', function () { loadReleases(); });
+
+$('installBtn').addEventListener('click', function () {
+  var r = RELEASES[$('updSelect').value];
+  if (!r || !r.assetUrl) { showToast('У выбранной версии нет файла CodeTime.exe'); return; }
   if (DEMO) { showToast('Демо-режим: обновление недоступно'); return; }
   var st = $('updateStatus');
-  $('doUpdateBtn').hidden = true;
-  st.innerHTML = '<span class="spinner"></span>Скачиваю v' + esc(d.latest) +
-    ' — обычно это пара минут, не закрывайте приложение…';
-  apiPost('/api/update/apply', { assetUrl: d.assetUrl, assetName: d.assetName })
+  $('installBtn').disabled = true;
+  st.innerHTML = '<span class="spinner"></span>Скачиваю v' + esc(r.version) +
+    ' — обычно пара минут, не закрывайте приложение…';
+  apiPost('/api/update/apply', { assetUrl: r.assetUrl, assetName: r.assetName })
     .then(function () {
-      st.textContent = 'Устанавливаю… приложение перезапустится';
       var tries = 0;
       var poll = setInterval(function () {
         tries++;
-        fetch('/api/settings').then(function (r) {
-          if (r.ok) { clearInterval(poll); location.reload(); }
-        }).catch(function () { /* сервер перезапускается — это нормально */ });
-        if (tries > 90) {
+        fetch('/api/update/status').then(function (resp) {
+          return resp.json();
+        }).then(function (s) {
+          if (s.state === 'error') {
+            clearInterval(poll);
+            $('installBtn').disabled = false;
+            st.textContent = 'Ошибка: ' + (s.message || 'неизвестно') +
+              ' (подробности в update.log в папке данных)';
+          } else if (s.message) {
+            st.textContent = s.message;
+          }
+        }).catch(function () { /* сервер закрылся — ставится новая версия */ });
+        fetch('/api/settings').then(function (resp) {
+          if (resp.ok) { clearInterval(poll); location.reload(); }
+        }).catch(function () { });
+        if (tries > 150) {
           clearInterval(poll);
-          st.textContent = 'Приложение не ответило — запустите CodeTime заново';
+          st.textContent = 'Обновление зависло — запустите CodeTime заново ' +
+            'или скачайте exe со страницы релизов GitHub.';
         }
-      }, 1000);
+      }, 2000);
     })
     .catch(function (err) {
+      $('installBtn').disabled = false;
       st.textContent = '';
       showToast('Не удалось обновиться: ' + err.message);
     });
 });
+
+// список версий — один раз при открытии приложения (не спамим GitHub в 30-сек цикле)
+loadReleases(true);
 
 // ---------- общий цикл обновления ----------
 

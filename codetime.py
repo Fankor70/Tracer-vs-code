@@ -55,7 +55,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '1.7.0'
+APP_VERSION = '1.8.0'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
@@ -1651,6 +1651,22 @@ def draw_app_icon(size=64, braces_color=(255, 255, 255, 255),
 
 APP = None  # глобальная ссылка на приложение для обработчика запросов
 
+# Состояние самообновления — фронтенд опрашивает GET /api/update/status
+UPDATE_STATUS = {'state': 'idle', 'message': '', 'ts': 0.0}
+
+
+def _upd_status(state, message):
+    """Запоминает шаг обновления (для UI) и пишет его в update.log."""
+    UPDATE_STATUS.update(state=state, message=str(message), ts=time.time())
+    logging.info('UPDATE %s: %s', state, message)
+    try:
+        with open(os.path.join(data_dir(), 'update.log'), 'a',
+                  encoding='utf-8', errors='replace') as f:
+            f.write('%s  %-10s  %s\n' % (
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'), state, message))
+    except Exception:
+        pass
+
 
 def resource_path(name):
     """Путь к ресурсу (в frozen-режиме — из sys._MEIPASS)."""
@@ -1667,6 +1683,20 @@ def _ver_newer(a, b):
         nums = re.findall(r'\d+', s or '')
         return tuple(int(x) for x in nums[:4]) if nums else (0,)
     return tup(a) > tup(b)
+
+
+def _clean_release_notes(text):
+    """Чистит заметки релиза: убирает служебную строку GitHub
+    (**Full Changelog**: …) и лишние переводы строк."""
+    out = []
+    for line in (text or '').replace('\r\n', '\n').split('\n'):
+        if 'full changelog' in line.lower():
+            continue
+        out.append(line.rstrip())
+    res = '\n'.join(out).strip()
+    while '\n\n\n' in res:
+        res = res.replace('\n\n\n', '\n\n')
+    return res
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1732,6 +1762,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._api_settings_get()
         if route == '/api/update/check':
             return self._api_update_check()
+        if route == '/api/update/releases':
+            return self._api_update_releases()
+        if route == '/api/update/status':
+            return self._api_update_status()
         return self._json({'error': 'Не найдено'}, code=404)
 
     def _serve_dashboard(self):
@@ -1856,13 +1890,14 @@ class Handler(BaseHTTPRequestHandler):
         with app.db_lock:
             rows = app.conn.execute(
                 'SELECT project, SUM(active_sec), SUM(idle_sec), SUM(clicks), '
-                'SUM(chars), SUM(words), COUNT(DISTINCT date), MIN(date) '
+                'SUM(chars), SUM(words), COUNT(DISTINCT date), MIN(date), MAX(date) '
                 'FROM day_stats WHERE date >= ? '
                 'GROUP BY project ORDER BY SUM(active_sec) DESC', (since,)).fetchall()
         total = sum(r[1] for r in rows) or 1
         result = [{
             'project': r[0], 'activeSec': r[1], 'idleSec': r[2], 'clicks': r[3],
             'chars': r[4], 'words': r[5], 'daysActive': r[6], 'firstDate': r[7],
+            'lastDate': r[8],
             'share': round(r[1] * 100.0 / total, 1),
         } for r in rows]
         return self._json(result)
@@ -2267,6 +2302,7 @@ class Handler(BaseHTTPRequestHandler):
                 {'error': 'Не удалось принять обновление: %s' % e}, code=400)
         logging.info('Обновление принято: %s (%d байт). Устанавливаю…',
                      fname, length)
+        _upd_status('installing', 'Устанавливаю обновление из файла…')
         # сначала отвечаем клиенту, установка — в отдельном потоке
         threading.Timer(0.7, self_update_apply, args=(tmp_path,)).start()
         return self._json({'ok': True,
@@ -2304,13 +2340,67 @@ class Handler(BaseHTTPRequestHandler):
                     break
         res = {'configured': True, 'current': APP_VERSION, 'latest': latest,
                'tagName': tag, 'releaseUrl': data.get('html_url') or '',
-               'notes': (data.get('body') or '')[:400],
+               'notes': _clean_release_notes(data.get('body') or '')[:400],
                'available': _ver_newer(latest, APP_VERSION)}
         if asset:
             res['assetUrl'] = asset.get('browser_download_url') or ''
             res['assetName'] = asset.get('name') or ''
             res['assetSize'] = int(asset.get('size') or 0)
         return self._json(res)
+
+    # ---------- GET: все версии репозитория (выбор и откат) ----------
+
+    def _api_update_releases(self):
+        """GET /api/update/releases — список ВСЕХ релизов репозитория.
+        Позволяет поставить любую версию: и подняться, и откатиться назад.
+        Репозиторий — из настроек или зашитая константа."""
+        app = APP
+        with app.db_lock:
+            repo = ((get_meta(app.conn, 'github_repo', '') or '').strip()
+                    or GITHUB_REPO_DEFAULT.strip())
+        if not repo or '/' not in repo:
+            return self._json({'configured': False, 'current': APP_VERSION})
+        url = 'https://api.github.com/repos/%s/releases?per_page=50' % repo
+        try:
+            req = urllib.request.Request(url, headers={
+                'User-Agent': 'CodeTime-updater',
+                'Accept': 'application/vnd.github+json'})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+        except Exception as e:
+            return self._json({'configured': True, 'current': APP_VERSION,
+                               'error': 'нет связи с GitHub (%s)' % e})
+        releases = []
+        for rel in data:
+            tag = (rel.get('tag_name') or '').strip()
+            if not tag:
+                continue
+            ver = tag.lstrip('vV') or tag
+            asset = None
+            for a in (rel.get('assets') or []):
+                n = (a.get('name') or '').lower()
+                if n.endswith('.exe') and 'old' not in n and 'setup' not in n:
+                    asset = a
+                    if 'codetime' in n:
+                        break
+            releases.append({
+                'tag': tag,
+                'version': ver,
+                'name': rel.get('name') or '',
+                'date': (rel.get('published_at') or '')[:10],
+                'notes': _clean_release_notes(rel.get('body') or '')[:400],
+                'assetUrl': (asset or {}).get('browser_download_url') or '',
+                'assetName': (asset or {}).get('name') or '',
+                'assetSize': int((asset or {}).get('size') or 0),
+                'relation': ('newer' if _ver_newer(ver, APP_VERSION)
+                             else 'current' if ver == APP_VERSION else 'older'),
+            })
+        return self._json({'configured': True, 'current': APP_VERSION,
+                           'releases': releases})
+
+    def _api_update_status(self):
+        """GET /api/update/status — шаг/ошибка последнего обновления."""
+        return self._json(dict(UPDATE_STATUS))
 
     # ---------- POST: скачать обновление с GitHub и поставить ----------
 
@@ -2335,9 +2425,11 @@ class Handler(BaseHTTPRequestHandler):
 
         def worker():
             try:
+                _upd_status('downloading',
+                            'Скачиваю обновление с GitHub — не закрывайте приложение…')
                 req = urllib.request.Request(
                     url, headers={'User-Agent': 'CodeTime-updater'})
-                with urllib.request.urlopen(req, timeout=120) as resp, \
+                with urllib.request.urlopen(req, timeout=300) as resp, \
                         open(tmp_path, 'wb') as f:
                     while True:
                         chunk = resp.read(1 << 16)
@@ -2352,6 +2444,7 @@ class Handler(BaseHTTPRequestHandler):
                 self_update_apply(tmp_path)
             except Exception as e:
                 logging.exception('Обновление с GitHub НЕ удалось: %r', e)
+                _upd_status('error', 'Скачивание/установка не удалась: %r' % e)
                 try:
                     os.remove(tmp_path)
                 except OSError:
@@ -2384,45 +2477,80 @@ def make_server():
 
 
 # ============================================================
-# Самообновление: замена exe «изнутри» + перезапуск
+# Самообновление: замена exe через батник-обменник + перезапуск
 # ============================================================
 
-def self_update_apply(tmp_path):
-    """Ставит загруженный через /api/update exe.
+def _write_update_bat(exe_dir, exe_name, stage_name):
+    """Пишет codetime_update.bat (строго ASCII + CRLF) рядом с exe.
 
-    Работающий exe нельзя удалить или перезаписать, но МОЖНО переименовать:
-      1) переименовываем себя в CodeTime.exe.old;
-      2) кладём новый файл на прежнее место;
-      3) запускаем новый exe (он дождётся освобождения порта — в main есть
-         повторные попытки привязки) и завершаемся.
-    Старый файл .old удаляется новым процессом через 15 секунд.
+    Батник живёт рядом с exe и работает с ОТНОСИТЕЛЬНЫМИ путями через
+    cd /d "%~dp0" — поэтому в самом файле нет ни одного не-ASCII символа,
+    даже если папка пользователя названа кириллицей.
+    Алгоритм: цикл «попробовать скопировать новый exe поверх старого» —
+    пока старый процесс жив, Windows не даёт перезаписать запущенный exe
+    (копирование возвращает ошибку), как только приложение закрылось,
+    копия проходит, батник стартует новый exe и удаляет сам себя.
+    """
+    bat = '\r\n'.join([
+        '@echo off',
+        'cd /d "%~dp0"',
+        ':wait',
+        'ping -n 2 127.0.0.1 >nul',
+        'copy /y "%s" "%s" >nul 2>&1' % (stage_name, exe_name),
+        'if errorlevel 1 goto wait',
+        'del /f /q "%s" >nul 2>&1' % stage_name,
+        'start "" "%s"' % exe_name,
+        'del /f /q "%~f0" >nul 2>&1',
+        '',
+    ])
+    bat_path = os.path.join(exe_dir, 'codetime_update.bat')
+    with open(bat_path, 'w', encoding='ascii', newline='') as f:
+        f.write(bat)
+    return bat_path
+
+
+def self_update_apply(tmp_path):
+    """Ставит загруженный exe и перезапускает приложение.
+
+    Работающий exe нельзя перезаписать — поэтому вместо хрупкой схемы
+    «переименовать себя + скопировать на то же место» (падала молча из-за
+    антивируса/залоченных файлов и приложение оставалось на старой версии)
+    используется батник-обменник:
+      1) новый exe кладём РЯДОМ как CodeTime_update.exe (3 попытки —
+         антивирус может временно держать скачанный файл);
+      2) пишем codetime_update.bat: он в цикле ждёт, пока наше приложение
+         закроется, затем копирует новый exe поверх старого и запускает его;
+      3) запускаем батник ОТДЕЛЬНО от приложения и закрываемся сами.
+    Такой способ не требует переименований работающего exe и не ломается
+    от повторных попыток обновления.
     """
     cur = os.path.abspath(sys.executable)
-    old = cur + '.old'
-    logging.info('Обновление: заменяю %s', cur)
+    exe_dir = os.path.dirname(cur) or '.'
+    exe_name = os.path.basename(cur)
+    root, ext = os.path.splitext(exe_name)
+    stage_name = root + '_update' + (ext or '.exe')
+    stage_path = os.path.join(exe_dir, stage_name)
     try:
-        try:
-            os.remove(old)
-        except OSError:
-            pass
-        os.rename(cur, old)
-        try:
-            shutil.copyfile(tmp_path, cur)
-        except Exception:
-            # откат: возвращаем старый exe на место, чтобы приложение не пропало
+        _upd_status('installing', 'Копирую новый exe рядом со старым…')
+        last_err = None
+        for _ in range(3):
             try:
-                os.rename(old, cur)
-            except OSError:
-                pass
-            raise
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
+                shutil.copyfile(tmp_path, stage_path)
+                last_err = None
+                break
+            except Exception as e:
+                last_err = e
+                time.sleep(1.0)
+        if last_err is not None:
+            raise last_err
+        bat_path = _write_update_bat(exe_dir, exe_name, stage_name)
+        logging.info('Обновление: батник готов (%s)', bat_path)
+        _upd_status('restarting', 'Закрываюсь — установщик подменит exe и запустит новую версию…')
     except Exception as e:
         logging.exception('Обновление НЕ удалось: %r', e)
+        _upd_status('error', 'Не удалось подготовить обновление: %r' % e)
         return
-    # финальный сброс в БД и выход (всё уже работало в фоне)
+    # финальный сброс в БД и выход — подмену сделает батник
     try:
         APP.flush_now()
     except Exception:
@@ -2431,15 +2559,19 @@ def self_update_apply(tmp_path):
         APP.conn.close()
     except Exception:
         pass
-    logging.info('Обновление установлено. Перезапуск…')
+    logging.info('Обновление: выходим, батник завершит установку…')
     try:
-        subprocess.Popen([cur], close_fds=True,
-                         creationflags=(0x00000008 | 0x08000000)
-                         if IS_WINDOWS else 0)  # DETACHED_PROCESS | CREATE_NO_WINDOW
+        flags = (0x00000008 | 0x08000000) if IS_WINDOWS else 0
+        subprocess.Popen(['cmd', '/c', bat_path], close_fds=True,
+                         cwd=exe_dir, creationflags=flags,
+                         stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
     except Exception as e:
-        logging.exception('Не удалось запустить обновлённый exe: %r', e)
+        logging.exception('Не удалось запустить установщик обновления: %r', e)
+        _upd_status('error', 'Не удалось запустить установщик: %r' % e)
         return
-    time.sleep(1.2)   # даём новому процессу стартовать, затем уходим сами
+    time.sleep(1.0)   # даём батнику стартовать, затем закрываемся
     os._exit(0)
 
 
