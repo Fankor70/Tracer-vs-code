@@ -1,0 +1,85 @@
+# ============================================================
+#  CodeTime — автосборка EXE и публикация релиза
+#
+#  Как это работает:
+#    1. Пушим тег версии:  git tag v1.6.0 && git push origin v1.6.0
+#    2. GitHub сам собирает CodeTime.exe на Windows-облаке
+#    3. Готовый exe автоматически прикрепляется к Release
+#    4. Приложение CodeTime на ПК пользователя видит новый
+#       релиз через GitHub API и обновляется по одной кнопке
+# ============================================================
+
+name: Release build
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Проверяем, что тег v1.6.0 совпадает с APP_VERSION в codetime.py,
+      # чтобы приложение всегда сверяло версию корректно
+      - name: Verify tag matches APP_VERSION
+        shell: bash
+        run: |
+          VER=$(python -c "import re; print(re.search(r\"APP_VERSION = '([^']+)'\", open('codetime.py', encoding='utf-8').read()).group(1))")
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "APP_VERSION=$VER  tag=$TAG"
+          if [ "v$VER" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Тег $GITHUB_REF_NAME не совпадает с APP_VERSION=$VER в codetime.py. Обнови APP_VERSION и переделай тег."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate icon.ico
+        run: python make_icon.py
+
+      # Та же команда, что в build_exe.bat — один-в-один
+      - name: Build CodeTime.exe
+        run: >
+          pyinstaller --onefile --noconsole --name CodeTime --icon=icon.ico
+          --add-data "dashboard.html;."
+          --hidden-import pynput.keyboard
+          --hidden-import pynput.keyboard._win32
+          --hidden-import pynput.mouse
+          --hidden-import pynput.mouse._win32
+          --hidden-import pystray._win32
+          --collect-all webview
+          --collect-all pythonnet
+          --collect-all clr_loader
+          --hidden-import webview.platforms.edgechromium
+          --hidden-import webview.platforms.winforms
+          codetime.py
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodeTime-windows
+          path: dist/CodeTime.exe
+          if-no-files-found: error
+
+      # Прикрепляем exe к релизу (релиз создаётся автоматически для тега)
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/CodeTime.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true

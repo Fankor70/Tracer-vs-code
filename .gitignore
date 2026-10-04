@@ -1,0 +1,17 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.spec
+
+# --- Сборка PyInstaller ---
+build/
+dist/
+icon.ico
+
+# --- Служебные ---
+*.log
+*.old
+*.tmp
+update.tmp
+.DS_Store
+Thumbs.db
