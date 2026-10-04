@@ -55,7 +55,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '1.8.1'
+APP_VERSION = '1.8.2'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
@@ -2542,6 +2542,142 @@ def make_server():
 
 
 # ============================================================
+# Защита от «после обновления не запускается» (v1.8.2)
+# ============================================================
+
+def _selftest_boot():
+    """Самопроверка нового exe — режим --selftest (v1.8.2).
+
+    Установщик запускает СКАЧАННЫЙ exe с этим флагом ДО подмены рабочего
+    файла. Если загрузчик PyInstaller смог распаковать архив, python312.dll
+    загрузился и модуль инициализировался — поднимаем HTTP-сервер на
+    СВОБОДНОМ порту (основное приложение держит 5731) и сразу выходим
+    с кодом 0. Любая ошибка до этого места (антивирус, битый файл) —
+    ненулевой код, и подмены НЕ будет вовсе."""
+    try:
+        srv = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    except Exception:
+        return 1
+    try:
+        t = threading.Thread(target=srv.serve_forever, daemon=True)
+        t.start()
+        srv.shutdown()
+        srv.server_close()
+    except Exception:
+        return 1
+    return 0
+
+
+def _mei_diagnosis():
+    """Best-effort диагностика после провала самотеста: смотрим свежую
+    временную папку _MEI* — если python312.dll в ней отсутствует, это
+    почти наверняка антивирус, и говорим об этом прямо."""
+    try:
+        tmp = os.environ.get('TEMP') or os.environ.get('TMP') or ''
+        if not tmp or not os.path.isdir(tmp):
+            return ''
+        best, best_m = None, 0.0
+        for n in os.listdir(tmp):
+            p = os.path.join(tmp, n)
+            if n.startswith('_MEI') and os.path.isdir(p):
+                try:
+                    m = os.path.getmtime(p)
+                except OSError:
+                    continue
+                if m > best_m:
+                    best, best_m = p, m
+        if not best or time.time() - best_m > 300:
+            return ''
+        if not os.path.exists(os.path.join(best, 'python312.dll')):
+            return ('. Похоже, антивирус удалил файлы из временной папки '
+                    'обновления (python312.dll отсутствует). Добавьте папку '
+                    'CodeTime в исключения антивируса и попробуйте ещё раз.')
+    except Exception:
+        pass
+    return ''
+
+
+def _selftest_stage(stage_path):
+    """Прогоняет новый exe в режиме --selftest ДО подмены рабочего файла.
+    Возвращает (True, None) либо (False, причина). Одна повторная попытка —
+    антивирус может задержать самый первый запуск нового файла."""
+    name = os.path.basename(stage_path)
+    flags = 0x08000000 if IS_WINDOWS else 0   # CREATE_NO_WINDOW
+    last = None
+    for attempt in (1, 2):
+        try:
+            r = subprocess.run([stage_path, '--selftest'], timeout=75,
+                               creationflags=flags,
+                               stdin=subprocess.DEVNULL,
+                               stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+            if r.returncode == 0:
+                return True, None
+            last = 'код выхода %s' % r.returncode
+        except subprocess.TimeoutExpired:
+            last = 'новый exe не завершился за 75 секунд'
+            try:
+                subprocess.run(['taskkill', '/f', '/im', name],
+                               stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=10)
+            except Exception:
+                pass
+        except Exception as e:
+            last = repr(e)
+        if attempt == 1:
+            time.sleep(4.0)   # возможно, антивирус сканировал первый запуск
+    return False, (last or 'неизвестная ошибка') + _mei_diagnosis()
+
+
+def _cleanup_mei_folders():
+    """Удаляет осиротевшие временные папки PyInstaller (_MEI*) из %TEMP%:
+    после аварийных завершений/убийств процесса они остаются и могут
+    содержать недокачанную распаковку. Живые папки заняты — удалить
+    не выйдет, молча пропускаем. Свежие (моложе 10 минут) не трогаем."""
+    tmp = os.environ.get('TEMP') or os.environ.get('TMP') or ''
+    if not tmp or not os.path.isdir(tmp):
+        return
+    now = time.time()
+    try:
+        names = os.listdir(tmp)
+    except OSError:
+        return
+    for n in names:
+        if not n.startswith('_MEI'):
+            continue
+        p = os.path.join(tmp, n)
+        if not os.path.isdir(p):
+            continue
+        try:
+            if now - os.path.getmtime(p) < 600:
+                continue
+            shutil.rmtree(p, ignore_errors=True)
+        except OSError:
+            pass
+
+
+def _port_owner_version():
+    """Если порт 5731 занят — спрашиваем у того, кто его держит, его версию.
+    None — не удалось получить ответ."""
+    try:
+        with urllib.request.urlopen(BASE_URL + '/api/settings', timeout=3) as r:
+            return (json.loads(r.read().decode('utf-8')) or {}).get('version')
+    except Exception:
+        return None
+
+
+def _alert(title, text):
+    """Простое сообщение пользователю даже без окна и трея (Windows)."""
+    logging.warning('%s: %s', title, text)
+    if IS_WINDOWS:
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, text, title, 0x00000040)
+        except Exception:
+            pass
+
+
+# ============================================================
 # Самообновление: замена exe через батник-обменник + перезапуск
 # ============================================================
 
@@ -2553,21 +2689,24 @@ def _write_update_bat(exe_dir, exe_name, stage_name):
     папка пользователя названа кириллицей.
 
     Алгоритм (максимально защищённый от «после обновления не запускается»):
-      1) БЭКПАП: старый exe копируется в CodeTime.exe.old (читать
+      1) чистим осиротевшие временные папки _MEI* (могут остаться после
+         аварийных завершений и мешать запуску);
+      2) БЭКПАП: старый exe копируется в CodeTime.exe.old (читать
          запущенный exe можно — заблокирована только перезапись);
-      2) цикл: ждём выхода приложения, копируем новый exe поверх
+      3) цикл: ждём выхода приложения, копируем новый exe поверх
          старого и СВЕРЯЕМ РАЗМЕРЫ (антивирус может мешать копированию);
-      3) запускаем новый exe и до ~30 секунд ждём, пока поднимется
+      4) запускаем новый exe и до ~30 секунд ждём, пока поднимется
          локальный сервер на порту 5731;
-      4) если сервер НЕ поднялся (битый файл, антивирус, обрыв
-         скачивания) — АВТОМАТИЧЕСКИ возвращаем CodeTime.exe.old на
-         место и запускаем старую рабочую версию;
-      5) удаляем временный exe и сам батник.
+      5) если сервер НЕ поднялся (битый файл, антивирус) — АВТОМАТИЧЕСКИ
+         возвращаем CodeTime.exe.old на место и запускаем старую
+         рабочую версию;
+      6) удаляем временный exe и сам батник.
     """
     bat_tpl = '\r\n'.join([
         '@echo off',
         'rem CodeTime self-update: backup, swap, verify, health-check, auto-rollback',
         'cd /d "%~dp0"',
+        'powershell -NoProfile -Command "Get-ChildItem $env:TEMP -Filter \'_MEI*\' -Directory -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt (Get-Date).AddMinutes(-10) } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue" >nul 2>&1',
         'copy /y "@EXE@" "@EXE@.old" >nul 2>&1',
         'set /a CT_TRIES=0',
         ':wait',
@@ -2649,6 +2788,31 @@ def self_update_apply(tmp_path):
                 time.sleep(1.0)
         if last_err is not None:
             raise last_err
+        # ГЛАВНАЯ ЗАЩИТА (v1.8.2): самотест нового exe ДО подмены.
+        # Не запускается на этом ПК (антивирус, битая загрузка) —
+        # отменяем установку, продолжаем работать на старой версии.
+        _upd_status('checking',
+                    'Проверяю, что новая версия запускается на этом ПК… '
+                    '(до минуты, окно ошибки закройте — отмена пройдёт сама)')
+        ok, why = _selftest_stage(stage_path)
+        if not ok:
+            try:
+                os.remove(stage_path)
+            except OSError:
+                pass
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            logging.error('Обновление ОТМЕНЕНО: самотест не пройден (%s)', why)
+            _upd_status('error',
+                        'Новая версия не смогла запуститься на этом компьютере '
+                        '(' + why + '). Обновление ОТМЕНЕНО — старая версия '
+                        'продолжает работать, данные не тронуты. Обычно это '
+                        'антивирус: добавьте папку CodeTime в исключения '
+                        '(Безопасность Windows → Защита от вирусов → '
+                        'Исключения) и повторите обновление.')
+            return
         bat_path = _write_update_bat(exe_dir, exe_name, stage_name)
         logging.info('Обновление: батник готов (%s)', bat_path)
         _upd_status('restarting', 'Закрываюсь — установщик подменит exe и запустит новую версию…')
@@ -2960,6 +3124,18 @@ def request_exit(app):
 def main():
     global APP
     setup_logging()
+
+    # Самотест нового exe (вызывается установщиком обновления):
+    # дойти до инициализации Python и старта сервера на свободном порту,
+    # сразу выйти с кодом 0. Ни БД, ни трей, ни движок тут не нужны.
+    if '--selftest' in sys.argv:
+        sys.exit(_selftest_boot())
+
+    # осиротевшие _MEI* из прошлых аварийных запусков убираем (v1.8.2)
+    _t_mei = threading.Timer(20.0, _cleanup_mei_folders)
+    _t_mei.daemon = True
+    _t_mei.start()
+
     logging.info('CodeTime %s запускается...', APP_VERSION)
 
     app = CodeTimeApp()
@@ -2999,6 +3175,17 @@ def main():
                 logging.info('Порт %d занят — жду освобождения…', PORT)
             time.sleep(1.0)
     if server is None:
+        # Порт занят: если там работает ДРУГАЯ версия CodeTime (старая
+        # копия-зомби), новое окно покажет ЧУЖОЙ интерфейс и старую версию —
+        # поэтому честно сообщаем и просим закрыть старую копию.
+        other = _port_owner_version()
+        if other and other != APP_VERSION:
+            _alert('CodeTime — уже запущена другая версия',
+                   'Порт %d занят CodeTime версии v%s, а запущена сейчас v%s.\n\n'
+                   'Закройте старую копию (иконка в трее рядом с часами → Выход, '
+                   'или Диспетчер задач → снять задачу «CodeTime.exe») и '
+                   'запустите CodeTime заново.' % (PORT, other, APP_VERSION))
+            return
         logging.info('Порт %d так и занят — CodeTime уже запущен. Открываю окно.', PORT)
         if not _open_app_mode_window():
             try:

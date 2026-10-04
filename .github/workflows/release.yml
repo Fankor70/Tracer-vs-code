@@ -81,11 +81,18 @@ jobs:
           path: dist/CodeTime.exe
           if-no-files-found: error
 
+      # Тело релиза = сообщение коммита (generate_release_notes допишет
+      # сравнение версий, приложение строку Full Changelog вырезает)
+      - name: Prepare release body
+        shell: bash
+        run: git log -1 --format=%B > release_body.md
+
       # Прикрепляем exe к релизу (релиз создаётся автоматически для тега)
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/CodeTime.exe
+          body_path: release_body.md
           generate_release_notes: true
           fail_on_unmatched_files: true
