@@ -66,7 +66,8 @@ jobs:
               sys.exit('::error::dashboard.html подозрительно мал (%d байт) — файл повреждён, сборка прервана' % size)
           html = open(p, encoding='utf-8').read()
           for probe in ('<!DOCTYPE html>', '</html>', '<script>', 'id="updateStatus"', 'id="installBtn"',
-                        'id="mentorMsgs"', 'id="mentorSendBtn"', 'data-tab="mentor"', 'id="tab-mentor"'):
+                        'id="mentorMsgs"', 'id="mentorSendBtn"', 'data-tab="mentor"', 'id="tab-mentor"',
+                        'function hlCode', 'id="mentorPlanView"', 'id="mentorNotesText"', '1.9.2'):
               if probe not in html:
                   sys.exit('::error::в dashboard.html нет обязательного фрагмента %r — файл повреждён' % probe)
           print('dashboard.html OK: %d байт, все фрагменты на месте' % size)
@@ -83,7 +84,8 @@ jobs:
               ast.parse(src)
           except Exception as e:
               sys.exit('::error::mentor.py отсутствует или не парсится: %r' % e)
-          for probe in ('def api_chat', 'def api_status', 'def ensure_all', 'CodeTimeMentor'):
+          for probe in ('def api_chat', 'def api_status', 'def ensure_all', 'CodeTimeMentor',
+                        'GEMINI_DEMO_KEY', 'last_review', 'notes.md', 'def _llm_chain'):
               if probe not in src:
                   sys.exit('::error::в mentor.py нет обязательного фрагмента %r' % probe)
           print('mentor.py OK: синтаксис чистый, все фрагменты на месте')
