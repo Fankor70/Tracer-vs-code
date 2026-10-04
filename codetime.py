@@ -55,7 +55,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '1.6.0'
+APP_VERSION = '1.7.0'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
@@ -598,8 +598,9 @@ CREATE TABLE IF NOT EXISTS roadmap_steps (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     title      TEXT NOT NULL,
     hours      REAL NOT NULL DEFAULT 10,
-    status     TEXT NOT NULL DEFAULT 'todo',   -- todo | doing | done
+    status     TEXT NOT NULL DEFAULT 'todo',   -- legacy: статус теперь считается сам
     order_idx  INTEGER NOT NULL DEFAULT 0,
+    spent_sec  INTEGER NOT NULL DEFAULT 0,     -- закреплённые за шагом секунды
     created_at TEXT NOT NULL
 );
 """
@@ -612,6 +613,14 @@ def init_db():
     conn.execute('PRAGMA journal_mode=WAL')
     conn.executescript(SQL_SCHEMA)
     conn.commit()
+    # миграция для баз, созданных до v1.7.0: колонка spent_sec,
+    # которая закрепляет набранное время за конкретным шагом
+    try:
+        conn.execute('ALTER TABLE roadmap_steps '
+                     'ADD COLUMN spent_sec INTEGER NOT NULL DEFAULT 0')
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass   # колонка уже есть
     # first_date — дата первого запуска
     row = conn.execute("SELECT value FROM meta WHERE key='first_date'").fetchone()
     if not row:
@@ -720,22 +729,94 @@ def roadmap_since(conn):
     return d
 
 
+def roadmap_sync_fill(conn):
+    """Заливает новое активное время в шаги плана, ЗАКРЕПЛЯЯ его за шагами.
+
+    Раньше время каждый раз заново разливалось по текущему порядку шагов —
+    из-за этого после перемещения шагов часы и статус «в процессе» прыгали
+    на тот шаг, который стоит первым. Теперь каждая залитая секунда
+    хранится в самом шаге (roadmap_steps.spent_sec) и при перемещении
+    остаётся с этим шагом. Статус «в процессе» прикреплён к факту, а не
+    к позиции в списке.
+
+    Правила заливки:
+      • новое время идёт в «текущий» шаг: первый по порядку шаг с
+        частичным прогрессом, а если его нет — первый неначатый;
+      • когда шаг добрал свои часы — очередь следующего по порядку;
+      • перемещение шагов НЕ переносит уже набранные часы.
+    """
+    since = roadmap_since(conn)
+    pool_now = int(conn.execute(
+        'SELECT COALESCE(SUM(active_sec),0) FROM day_stats WHERE date >= ?',
+        (since.isoformat(),)).fetchone()[0])
+    filled_raw = get_meta(conn, 'roadmap_filled', None)
+
+    if filled_raw is None or str(filled_raw).strip() == '':
+        # однократная миграция со старой модели: разливаем накопленное
+        # время ПО ПОРЯДКУ СОЗДАНИЯ шагов (id) — так ближе всего к тому,
+        # как шаги реально изучались, — и фиксируем результат навсегда
+        left = pool_now
+        for sid, cap in conn.execute(
+                'SELECT id, CAST(round(hours * 3600) AS INTEGER) '
+                'FROM roadmap_steps ORDER BY id').fetchall():
+            if left <= 0:
+                break
+            add = min(left, cap)
+            if add > 0:
+                conn.execute('UPDATE roadmap_steps SET spent_sec=? WHERE id=?',
+                             (add, sid))
+                left -= add
+        set_meta(conn, 'roadmap_filled', str(pool_now))
+        return
+
+    new_sec = pool_now - int(float(filled_raw))
+    if new_sec <= 0:
+        return
+
+    while new_sec > 0:
+        # «текущий» шаг: первый по порядку с частичным прогрессом…
+        row = conn.execute(
+            'SELECT id, spent_sec, CAST(round(hours * 3600) AS INTEGER) '
+            'FROM roadmap_steps '
+            'WHERE hours > 0 AND spent_sec > 0 '
+            'AND spent_sec < CAST(round(hours * 3600) AS INTEGER) '
+            'ORDER BY order_idx, id LIMIT 1').fetchone()
+        if row is None:
+            # …иначе первый неначатый по порядку
+            row = conn.execute(
+                'SELECT id, spent_sec, CAST(round(hours * 3600) AS INTEGER) '
+                'FROM roadmap_steps '
+                'WHERE hours > 0 AND spent_sec = 0 '
+                'ORDER BY order_idx, id LIMIT 1').fetchone()
+        if row is None:
+            break   # все шаги закрыты — остаток времени не приписываем задним числом
+        sid, spent, cap = int(row[0]), int(row[1] or 0), int(row[2])
+        add = min(new_sec, max(0, cap - spent))
+        if add <= 0:
+            break
+        conn.execute('UPDATE roadmap_steps SET spent_sec=? WHERE id=?',
+                     (spent + add, sid))
+        new_sec -= add
+    set_meta(conn, 'roadmap_filled', str(pool_now))
+
+
 def roadmap_state(conn):
     """GET /api/roadmap: план, синхронизированный с активным временем.
 
     Те же активные секунды, что считает «Обзор», с даты roadmap_since
-    распределяются по шагам ПО ПОРЯДКУ: шаг 1 набирает свои часы, когда
-    они набраны — очередь шага 2 и так далее. Прогресс шага (spentSec)
-    вычисляется на лету, ничего не хранится — рассинхрон невозможен.
-    Статус шага теперь автоматический:
+    заливаются в шаги и ЗАКРЕПЛЯЮТСЯ за ними (roadmap_sync_fill):
+    набранные часы и статус «в процессе» следуют за шагом, а не за
+    позицией в списке — перемещение шагов ничего не переносит.
+    Статус шага автоматический (по закреплённому времени):
       done  — время шага набрано полностью;
-      doing — набрано частично;
+      doing — набрано частично (шаг сейчас в работе);
       todo  — до шага очередь ещё не дошла.
     Проекция дат (Таймлайн) идёт только по НЕЗАВЕРШЁННЫМ часам:
     days = max(1, ceil(остаток_часов / capacity)).
     fit.requiredHoursDay = остаток часов / дни до targetDate включительно.
     """
     today = date.today()
+    roadmap_sync_fill(conn)
     row = conn.execute(
         'SELECT title, target_date, daily_hours FROM roadmap_goal WHERE id=1').fetchone()
     goal = {
@@ -744,13 +825,10 @@ def roadmap_state(conn):
         'dailyHours': float(row[2] or 0.0) if row else 0.0,
     }
     steps_rows = conn.execute(
-        'SELECT id, title, hours, status, order_idx FROM roadmap_steps '
+        'SELECT id, title, hours, status, order_idx, spent_sec FROM roadmap_steps '
         'ORDER BY order_idx, id').fetchall()
 
     since = roadmap_since(conn)
-    pool = conn.execute(
-        'SELECT COALESCE(SUM(active_sec),0) FROM day_stats WHERE date >= ?',
-        (since.isoformat(),)).fetchone()[0]
     today_active = conn.execute(
         'SELECT COALESCE(SUM(active_sec),0) FROM day_stats WHERE date=?',
         (today.isoformat(),)).fetchone()[0]
@@ -774,11 +852,10 @@ def roadmap_state(conn):
     spent_hours = 0.0
     total_days = 0
     finish = None
-    for sid, title, hours, _status, oidx in steps_rows:
+    for sid, title, hours, _status, oidx, spent in steps_rows:
         hours = float(hours or 0.0)
         cap_sec = int(round(hours * 3600))
-        spent = int(max(0, min(pool, cap_sec)))
-        pool -= spent
+        spent = int(max(0, min(int(spent or 0), cap_sec)))
         total_hours += hours
         spent_hours += spent / 3600.0
         if cap_sec > 0 and spent >= cap_sec:
@@ -2133,7 +2210,8 @@ class Handler(BaseHTTPRequestHandler):
                 "AND name != 'meta'")]
             for table in tables:
                 conn.execute('DELETE FROM "%s"' % table.replace('"', '""'))
-            conn.execute("DELETE FROM meta WHERE key IN ('xp_state', 'roadmap_since')")
+            conn.execute("DELETE FROM meta WHERE key IN "
+                         "('xp_state', 'roadmap_since', 'roadmap_filled')")
             conn.execute("INSERT OR REPLACE INTO meta(key, value) "
                          "VALUES('first_date', ?)",
                          (datetime.now().strftime('%Y-%m-%d'),))
