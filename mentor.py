@@ -117,15 +117,18 @@ DEFAULT_CONFIG = {
 }
 
 # --- Встроенный Gemini: демо-ключ от автора CodeTime (v1.9.2) ---------
-# Бесплатный тариф Google AI Studio. Ключ открыт в коде СПЕЦИАЛЬНО:
-# чтобы Наставник работал у всех сразу, без настройки. Лимит общий —
-# при исчерпании (429) или региональной блокировке цепочка уходит в резерв.
+# ВНИМАНИЕ (v2.4.2): встроенный ключ AIzaSy… СКОМПРОМЕТИРОВАН —
+# Google нашёл его в открытом репозитории и навсегда отключил
+# (403 «reported as leaked»). Он оставлен в цепочке последним шансом
+# на случай разблокировки, но считать его рабочим нельзя. Чтобы ИИ
+# работал стабильно: свой бесплатный ключ aistudio.google.com/apikey
+# → Настройки → «Свой ключ» (адрес generativelanguage.googleapis.com/v1beta/openai,
+# модель gemini-2.5-flash) — либо ключ OpenRouter.
 GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai'
 GEMINI_DEMO_KEY = 'REDACTED_LEAKED_KEY'
-# Порядок моделей: та, что реально отвечает у большинства, — первая.
-# Если Google сменит каталог — студент вписывает свою в Настройках.
-GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash',
-                 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
+# Порядок моделей: реальные и живые — первыми (проверено по каталогу).
+GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite',
+                 'gemini-2.0-flash', 'gemini-3.8-flash']
 GEMINI_DISABLE_MIN = 60   # пауза после региональной блокировки/блокировки ключа, минут
 GEMINI_GET_KEY_URL = 'aistudio.google.com/apikey'
 
@@ -133,9 +136,13 @@ GEMINI_GET_KEY_URL = 'aistudio.google.com/apikey'
 # Pollinations, anonymous tier. Параметр referrer обязателен: без него
 # API отвечает 402 Payment Required. 'private' — не показывать запрос
 # в публичной ленте сервиса.
+# v2.4.2: у анонимного тарифа жёсткий лимит на длину промпта —
+# длинные (>~4–6К символов) отдают 402/500. Поэтому резерву всегда
+# отдаём СЖАТЫЙ контекст (см. _demo_messages), а не полный код.
 DEMO_LLM_BASE = 'https://text.pollinations.ai/openai'
 DEMO_LLM_MODEL = 'openai-fast'   # GPT-OSS 20B reasoning, текст без vision
 DEMO_LLM_REFERRER = 'codetime-mentor'
+DEMO_LLM_MAX_CHARS = 1800        # суммарный потолок промпта в резерв
 
 # --- GitHub Models: бесплатный ИИ по обычному токену GitHub ----------
 # Тот же PAT, что для чтения репозитория (право Models: Read), открывает
@@ -143,6 +150,9 @@ DEMO_LLM_REFERRER = 'codetime-mentor'
 # студент вписывает другое в Настройках.
 GH_MODELS_BASE = 'https://models.github.ai/inference'
 GH_MODELS_MODEL = 'openai/gpt-4.1-mini'
+# v2.4.2: фолбэк внутри GitHub Models — если первая модель недоступна
+# (лимит/каталог), пробуем вторую, прежде чем уйти дальше по цепочке.
+GH_MODELS_FALLBACKS = ['openai/gpt-4.1-nano', 'openai/gpt-4o-mini']
 
 
 class MentorError(ValueError):
@@ -321,6 +331,14 @@ def load_config():
 
 
 def save_config(patch):
+    patch = dict(patch or {})
+    # v2.4.2: понимаем и camelCase из UI (apiKey/apiBase/visionModel)
+    for camel, snake in (('apiKey', 'api_key'), ('apiBase', 'api_base'),
+                         ('visionModel', 'vision_model'),
+                         ('ghToken', 'gh_token'), ('orKey', 'or_key'),
+                         ('clearOwnKey', 'clear_own_key')):
+        if camel in patch and snake not in patch:
+            patch[snake] = patch[camel]
     cfg = load_config()
     for k in ('api_base', 'model', 'vision_model', 'repo'):
         if k in patch and patch[k] is not None:
@@ -332,6 +350,11 @@ def save_config(patch):
             cfg[k] = str(v).strip()[:300]
     if patch.get('clear_or_key'):
         cfg['or_key'] = ''
+    if patch.get('clear_own_key'):
+        cfg['api_key'] = ''
+        cfg['api_base'] = ''
+        cfg['model'] = ''
+        cfg['vision_model'] = ''
     _write(CONFIG_PATH, json.dumps(cfg, ensure_ascii=False, indent=2))
     logging.info('Наставник: конфиг сохранён (api_base=%r, repo=%r, ключ=%s, OR=%s)',
                  cfg['api_base'], cfg['repo'], bool(cfg['api_key']),
@@ -579,7 +602,8 @@ def _llm_chain(cfg, force_gemini=False):
     if cfg['gh_token']:
         chain.append({'mode': 'github', 'base': GH_MODELS_BASE,
                       'key': cfg['gh_token'],
-                      'models': [cfg['model'] or GH_MODELS_MODEL],
+                      'models': [cfg['model'] or GH_MODELS_MODEL]
+                                + GH_MODELS_FALLBACKS,
                       'url_suffix': '/chat/completions', 'extra': {},
                       'timeout': 150})
     if force_gemini or not _gemini_blocked():
@@ -639,6 +663,40 @@ def _short_err(e):
     return s[:160] if s else 'нет связи'
 
 
+def _setup_report(cfg, mode_errs):
+    """v2.4.2: честный отчёт по всей цепочке для финальной ошибки —
+    кто не подключён, а кто упал и почему. mode_errs: {mode: ошибка}."""
+    parts = []
+    if cfg['or_key']:
+        if 'openrouter' in mode_errs:
+            parts.append('OpenRouter — ' + mode_errs['openrouter'])
+    else:
+        parts.append('OpenRouter — ключ не подключён (Настройки → OpenRouter)')
+    if cfg['api_key'] and cfg['api_base']:
+        if 'key' in mode_errs:
+            parts.append('свой ключ — ' + mode_errs['key'])
+    if cfg['gh_token']:
+        if 'github' in mode_errs:
+            parts.append('GitHub Models — ' + mode_errs['github'])
+    else:
+        parts.append('GitHub Models — токен не подключён (Настройки → GitHub)')
+    st = _gemini_state()
+    if _gemini_blocked(st):
+        parts.append('Gemini — пауза: %s' % (st.get('reason') or
+                                             'встроенный ключ заблокирован'))
+    elif 'gemini' in mode_errs:
+        parts.append('Gemini — ' + mode_errs['gemini'])
+    if 'demo' in mode_errs:
+        parts.append('резерв — ' + mode_errs['demo'])
+    return parts
+
+
+_CHAIN_ADVICE = ('Что делать: вставьте бесплатный ключ OpenRouter '
+                 '(openrouter.ai/keys) в Настройках — это те же модели, что '
+                 'на сайте; либо подключите GitHub-токен; либо получите '
+                 'свой ключ Gemini: ' + GEMINI_GET_KEY_URL)
+
+
 def _parse_content(data):
     """Достаёт текст из ответа chat/completions.
     Терпит missing content (только reasoning), список частей,
@@ -675,22 +733,49 @@ def _parse_content(data):
 
 def _demo_messages(messages):
     """Сообщения для резерва (Pollinations, анонимный тариф): роль system
-    там отдаёт 402 — склеиваем системный промпт в первое user-сообщение.
-    Длинные промпты тоже режем: анонимный тариф ограничивает объём."""
+    там отдаёт 402 — склеиваем инструкцию в первое user-сообщение.
+    v2.4.2: длинные промпты у резерва падают (402/500) — режем ВСЁ:
+    инструкцию (она может приходить и ролью assistant — см. api_send),
+    промежуточную историю и последнее сообщение укладываем в бюджет."""
     plain = [{'role': m.get('role') or 'user',
               'content': m['content'] if isinstance(m.get('content'), str)
               else ' '.join(p.get('text', '') for p in m['content']
                             if isinstance(p, dict) and p.get('type') == 'text')}
              for m in messages]
-    sys_txt = '\n\n'.join(m['content'] for m in plain if m['role'] == 'system')
-    if len(sys_txt) > 1600:
-        sys_txt = sys_txt[:1600].rsplit('\n', 1)[0] + \
+    # инструкция: явная system ЛИБО первое assistant-сообщение (так api_send
+    # передаёт системный промпт) — иначе она не узнаётся и уходит целиком
+    sys_txt = ''
+    rest = []
+    for i, m in enumerate(plain):
+        if not rest and (m['role'] == 'system' or
+                         (m['role'] == 'assistant' and i == 0)):
+            sys_txt = m['content']
+            continue
+        rest.append(m)
+    budget = DEMO_LLM_MAX_CHARS
+    # приоритет — последнему сообщению (сам вопрос/код): до 60% бюджета
+    tail_budget = int(budget * 0.6)
+    if rest:
+        last = rest[-1]['content']
+        if len(last) > tail_budget:
+            last = last[:tail_budget].rsplit('\n', 1)[0] + \
+                '\n…(обрезано, чтобы уложиться в бесплатный лимит резерва)'
+        rest[-1] = dict(rest[-1], content=last)
+        budget -= len(last)
+    if len(sys_txt) > budget:
+        sys_txt = sys_txt[:max(budget, 200)].rsplit('\n', 1)[0] + \
             '\n…(контекст сокращён, чтобы уложиться в бесплатный лимит)'
-    rest = [m for m in plain if m['role'] != 'system']
+    # промежуточные сообщения истории — по 200 символов, не больше
+    for i in range(len(rest) - 1):
+        c = rest[i]['content']
+        if len(c) > 200:
+            rest[i] = dict(rest[i], content=c[:200] + '…')
     if sys_txt and rest:
         rest[0] = dict(rest[0],
                        content='[Инструкция]\n' + sys_txt +
                                '\n\n[Сообщение]\n' + rest[0]['content'])
+    elif sys_txt:
+        rest = [{'role': 'user', 'content': '[Инструкция]\n' + sys_txt}]
     return rest
 
 
@@ -700,7 +785,7 @@ def llm_chat(messages, model=None, timeout=None):
     """
     cfg = load_config()
     last_err = None
-    seen_errs = []
+    mode_errs = {}
     for prov in _llm_chain(cfg):
         url = prov['base'] + prov['url_suffix']
         headers = {'Content-Type': 'application/json',
@@ -734,6 +819,7 @@ def llm_chat(messages, model=None, timeout=None):
                     return text, prov['mode'], m
                 except MentorError as e:
                     last_err = e
+                    mode_errs[prov['mode']] = _short_err(e)
                     kind = _classify_error(e)
                     if kind == 'region' and prov['mode'] == 'gemini':
                         # Google блокирует регион — пауза на час, дальше по цепочке
@@ -775,25 +861,17 @@ def llm_chat(messages, model=None, timeout=None):
                     if kind == 'throttle' and delay == attempts[-1]:
                         break       # лимит — следующая модель/провайдер
                     # сеть/прочее: у demo повтор с паузой, у прочих — дальше
-        if last_err and str(last_err) not in seen_errs:
-            seen_errs.append(str(last_err))
     if last_err:
         kind = _classify_error(last_err)
         if kind == 'leak':
             raise MentorError(
-                'Встроенный демо-ключ Gemini заблокирован Google (он попал в '
-                'открытый доступ). Это лечится своим бесплатным ключом за '
-                '2 минуты: ' + GEMINI_GET_KEY_URL + ' → «Create API key» → '
-                'вставить в Настройках Наставника. До этого работает резерв '
-                'без фото.')
-        if kind == 'throttle' or kind == 'region':
-            raise MentorError(
-                'Бесплатные ИИ перегружены или временно ограничены '
-                '(последняя причина: %s). Подождите 1–2 минуты и повторите — '
-                'либо вставьте свой ключ в Настройках Наставника: там лимиты '
-                'личные.' % _short_err(last_err))
-        raise MentorError('ИИ недоступен: %s Проверьте интернет и настройки '
-                          'Наставника.' % _short_err(last_err))
+                'ИИ недоступен. %s. %s'
+                % ('; '.join(_setup_report(cfg, mode_errs)) or 'все провайдеры упали',
+                   _CHAIN_ADVICE))
+        raise MentorError(
+            'ИИ недоступен. Причины по цепочке: %s. %s'
+            % ('; '.join(_setup_report(cfg, mode_errs)) or _short_err(last_err),
+               _CHAIN_ADVICE))
     raise MentorError('ИИ недоступен: цепочка провайдеров пуста.')
 
 
@@ -1387,7 +1465,10 @@ def call_agent(role, messages, need_vision=False):
     started = time.time()
     cfg = load_config()
     errors = []
+    mode_errs = {}
     last_kind = None
+    TAG2MODE = {'openrouter': 'openrouter', 'свой ключ': 'key',
+                'github': 'github', 'gemini': 'gemini', 'резерв': 'demo'}
 
     def try_provider(tag, fn):
         nonlocal last_kind
@@ -1397,6 +1478,8 @@ def call_agent(role, messages, need_vision=False):
             kind = _classify_error(e)
             last_kind = kind
             errors.append('%s: %s' % (tag, _short_err(e)))
+            mode_errs[TAG2MODE.get(tag.split('/')[0], tag.split('/')[0])] = \
+                _short_err(e)
             logging.warning('Наставник: агент %s, провайдер %s упал (%s): %s',
                             role, tag, kind, _short_err(e))
             return None
@@ -1432,19 +1515,23 @@ def call_agent(role, messages, need_vision=False):
         if res is not None:
             return res, 'key', model, time.time() - started
 
-    # 3) GitHub Models
+    # 3) GitHub Models (v2.4.2: фолбэк моделей внутри провайдера)
     if cfg['gh_token']:
-        payload = {'messages': messages, 'stream': False, 'max_tokens': 4000}
-        headers = {'Content-Type': 'application/json',
-                   'Authorization': 'Bearer ' + cfg['gh_token'],
-                   'User-Agent': 'CodeTime-Mentor/' + _ver()}
-
-        def _ghm():
-            url = GH_MODELS_BASE + '/chat/completions'
-            return _parse_content(_http_json(url, payload, headers, 150))
-        res = try_provider('github', _ghm)
-        if res is not None:
-            return res, 'github', GH_MODELS_MODEL, time.time() - started
+        gh_models = [cfg['model'] or GH_MODELS_MODEL] + GH_MODELS_FALLBACKS
+        for gm in gh_models:
+            def _ghm(gm=gm):
+                payload = {'messages': messages, 'stream': False,
+                           'max_tokens': 4000, 'model': gm}
+                headers = {'Content-Type': 'application/json',
+                           'Authorization': 'Bearer ' + cfg['gh_token'],
+                           'User-Agent': 'CodeTime-Mentor/' + _ver()}
+                url = GH_MODELS_BASE + '/chat/completions'
+                return _parse_content(_http_json(url, payload, headers, 150))
+            res = try_provider('github/' + gm, _ghm)
+            if res is not None:
+                return res, 'github', gm, time.time() - started
+            if last_kind == 'auth':
+                break   # токен отклонён — другие модели не помогут
 
     # 4) встроенный Gemini (демо-ключ; состояние блокировок кэшируется)
     if not _gemini_blocked():
@@ -1512,9 +1599,11 @@ def call_agent(role, messages, need_vision=False):
     if res is not None:
         return res, 'demo', DEMO_LLM_MODEL, time.time() - started
 
-    raise MentorError('ИИ-команда недоступна (последняя причина: %s). '
-                      'Проверьте интернет и Настройки.'
-                      % (errors[-1] if errors else 'нет связи'))
+    # v2.4.2: честный итог — кто не подключён, кто упал и почему
+    raise MentorError('ИИ-команда недоступна. Причины по цепочке: %s. %s'
+                      % ('; '.join(_setup_report(cfg, mode_errs))
+                         or (errors[-1] if errors else 'нет связи'),
+                         _CHAIN_ADVICE))
 
 
 def call_mentor_text(user_text, history=None, need_vision=False):
@@ -1662,8 +1751,13 @@ def api_send(data):
         ext = os.path.splitext(safe)[1].lower()
         mime = {'.png': 'image/png', '.webp': 'image/webp',
                 '.gif': 'image/gif'}.get(ext, 'image/jpeg')
-        with open(full, 'rb') as f:
-            b64 = base64.b64encode(f.read()).decode('ascii')
+        # v2.4.2: любое неожиданное исключение здесь было источником 500-х
+        try:
+            with open(full, 'rb') as f:
+                b64 = base64.b64encode(f.read()).decode('ascii')
+        except OSError as e:
+            raise MentorError('Не удалось прочитать фото (%s). '
+                              'Прикрепите его заново.' % e)
         prompt = LAYOUT_VISION_PROMPT + \
             ('\n\nВопрос ученика к этому изображению: «%s»' % text if text else '')
         vision_content = [
@@ -1679,13 +1773,23 @@ def api_send(data):
                 need_vision=True)
         except MentorError as e:
             image_note = '[vision-модель не смогла разобрать фото: %s]' % e
+        except Exception as e:
+            logging.exception('Наставник: сбой vision-шага: %r', e)
+            image_note = '[vision-модель упала с неожиданной ошибкой: %s]' % e
 
     # 2. Файлы GitHub, выбранные учеником
     attached = []
     if gh_paths:
         if not cfg['repo']:
             raise MentorError('Репозиторий не подключён (Настройки → GitHub).')
-        attached = fetch_repo_files(cfg, gh_paths)
+        try:
+            attached = fetch_repo_files(cfg, gh_paths)
+        except MentorError:
+            raise
+        except Exception as e:
+            logging.exception('Наставник: сбой загрузки файлов GitHub: %r', e)
+            raise MentorError('Не удалось скачать файлы из GitHub: %s. '
+                              'Проверьте интернет и токен в Настройках.' % e)
 
     # 3. Сообщение ученика
     now = datetime.now().isoformat(timespec='seconds')
