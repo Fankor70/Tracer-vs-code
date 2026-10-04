@@ -8,8 +8,15 @@ make_icon.py — генерирует tracker/icon.ico для CodeTime.exe.
 """
 
 import os
+import sys
 
 from PIL import Image, ImageDraw
+
+# чтобы русский print() не падал в консолях без юникода (Windows CI/cp1252)
+try:
+    sys.stdout.reconfigure(errors='replace')
+except Exception:
+    pass
 
 SIZE = 256          # рисуем в большом разрешении, потом уменьшаем
 ICO_SIZES = [(16, 16), (32, 32), (48, 48), (64, 64)]
