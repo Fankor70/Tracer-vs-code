@@ -1646,11 +1646,11 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: 'ivanov/CodeTime',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '2.0.0' };
+             version: '2.0.1' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '2.0.0', latest: '2.0.0',
-             tagName: 'v2.0.0', available: false,
+    return { configured: true, current: '2.0.1', latest: '2.0.1',
+             tagName: 'v2.0.1', available: false,
              assetName: 'CodeTime.exe', assetSize: 22048000,
              releaseUrl: '#', notes: 'Альфа: чат Наставника в стиле эталона — аватар у каждого ответа, пузыри сообщений, индикатор набора, кнопка «вниз», подпись провайдера и модели под ответом; ключ Gemini и новые фолбэки ИИ-цепочки' };
   }
@@ -2991,9 +2991,12 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
-    { tag: 'v2.0.0', version: '2.0.0', date: '2026-10-05', assetSize: 22075000,
-      notes: 'АЛЬФА: чат Наставника в стиле эталона — аватар у каждого ответа, пузыри сообщений, индикатор набора, кнопка «вниз», подпись провайдера и модели (Gemini / GitHub Models / свой ключ / резерв) под каждым ответом; свой бесплатный ключ Gemini в один клик; умные фолбэки ИИ-цепочки и честные ошибки.',
+    { tag: 'v2.0.1', version: '2.0.1', date: '2026-10-05', assetSize: 22075000,
+      notes: 'АЛЬФА-фикс: чат Наставника в стиле эталона — аватар у каждого ответа, пузыри сообщений, индикатор набора, кнопка «вниз», подпись провайдера и модели (Gemini / GitHub Models / свой ключ / резерв) под каждым ответом; свой бесплатный ключ Gemini в один клик; умные фолбэки ИИ-цепочки и честные ошибки.',
       relation: 'current' },
+    { tag: 'v2.0.0', version: '2.0.0', date: '2026-10-05', assetSize: 21850707,
+      notes: 'АЛЬФА: чат Наставника в стиле эталона — аватар у каждого ответа, пузыри сообщений, индикатор набора, кнопка «вниз», подпись провайдера и модели; живучая ИИ-цепочка с честными ошибками.',
+      relation: 'older' },
     { tag: 'v1.9.4', version: '1.9.4', date: '2026-10-05', assetSize: 22075000,
       notes: 'Чат Наставника перерисован «как у эталона»: ответы наставника — чистый текст без рамки, сообщения пользователя — нейтральные пузыри; настоящая блочная разметка; код-блоки в тёмной теме с подсветкой и копированием; длинные ответы сворачиваются с плавной шторкой.',
       relation: 'older' },
@@ -3610,6 +3613,7 @@ function mentorRenderMsgs() {
   var box = $('mentorMsgs');
   if (!M.msgs.length) {
     box.innerHTML = mentorWelcomeHtml();
+    box.scrollTop = 0;   // после «Очистить чат» лента могла быть прокручена вниз
     $('mentorJump').classList.remove('show');
     return;
   }
