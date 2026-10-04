@@ -473,46 +473,70 @@
   /* ---------- Пустые состояния ---------- */
   .empty { color: var(--muted); text-align: center; padding: 26px 10px; font-size: 14px; }
   .empty .big { font-size: 30px; display: block; margin-bottom: 8px; }
-  /* ---------- Наставник (v1.9.4, стиль как в референсе) ---------- */
+  /* ---------- Наставник (v2.0, визуал как в эталоне) ---------- */
   .m-subtabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
   .m-subtab {
     border: 1px solid var(--border); background: var(--panel); color: var(--muted);
-    padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13.5px; font-family: inherit;
+    padding: 7px 14px; border-radius: 9px; cursor: pointer; font-size: 13.5px; font-family: inherit;
+    transition: all .15s;
   }
-  .m-subtab:hover { color: var(--text); }
+  .m-subtab:hover { color: var(--text); border-color: #3a4350; }
   .m-subtab.active { color: var(--green); background: var(--green-dim); border-color: rgba(16,185,129,.35); }
   .m-pane { display: none; }
   .m-pane.active { display: block; }
-  .m-chat-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .m-chat-card {
+    display: flex; flex-direction: column; padding: 0; overflow: hidden; position: relative;
+    height: calc(100vh - 330px); min-height: 520px; max-height: 1000px;
+  }
   .m-chat-head {
-    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 11px; padding: 13px 18px;
     border-bottom: 1px solid var(--border); background: var(--panel2); flex-wrap: wrap;
   }
   .m-ava {
-    width: 34px; height: 34px; border-radius: 10px; background: var(--green-dim);
-    border: 1px solid rgba(16,185,129,.35); display: flex; align-items: center;
-    justify-content: center; font-size: 18px; flex: none;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #047857);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px; flex: none; box-shadow: 0 0 0 3px rgba(16,185,129,.13);
   }
-  .m-who b { display: block; font-size: 14px; }
-  .m-who span { font-size: 12px; color: var(--muted); }
+  .m-who b { display: block; font-size: 14.5px; }
+  .m-who span { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .m-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.8); flex: none; }
   .m-chat-head .right { margin-left: auto; }
+  /* Лента: колонка-«документ» с воздухом, как в эталоне */
   .m-msgs {
-    flex: 1 1 auto; height: calc(100vh - 360px); min-height: 420px; max-height: 820px;
-    overflow-y: auto; padding: 20px 22px;
-    display: flex; flex-direction: column; gap: 18px;
+    flex: 1 1 auto; overflow-y: auto; padding: 26px 22px 14px;
+    display: flex; flex-direction: column; gap: 26px;
   }
-  .m-msgs::-webkit-scrollbar { width: 8px; }
-  .m-msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  /* Сообщения: ответ наставника — чистый текст без «пузыря», как в референсе;
-     сообщение пользователя — нейтральный пузырь справа */
+  .m-msgs::-webkit-scrollbar { width: 9px; }
+  .m-msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  .m-msgs::-webkit-scrollbar-thumb:hover { background: #3a4350; }
+  /* Ряд сообщения: бот — аватар + колонка, юзер — пузырь справа */
+  .m-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; max-width: 920px; margin: 0 auto; }
+  .m-row.u-row { justify-content: flex-end; }
+  .m-ava-sm {
+    width: 34px; height: 34px; border-radius: 50%; flex: none;
+    background: linear-gradient(135deg, #10b981, #047857);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; box-shadow: 0 0 0 3px rgba(16,185,129,.11);
+  }
+  .m-col { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .m-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+  .m-msg-head b { font-size: 13.5px; }
+  .m-msg-head time, .m-meta time { font-size: 11.5px; color: var(--muted); }
+  /* Сообщения: ответ наставника — чистый текст без «пузыря», как в эталоне;
+     сообщение пользователя — пузырь справа */
   .m-msg {
-    font-size: 14.5px; line-height: 1.65;
+    font-size: 15px; line-height: 1.7;
     word-wrap: break-word; overflow-wrap: break-word; min-width: 0;
   }
   .m-msg.user {
-    align-self: flex-end; max-width: 78%; width: fit-content;
-    background: var(--panel2); border-radius: 16px 16px 5px 16px; padding: 10px 15px;
+    max-width: min(80%, 660px); width: fit-content;
+    background: #262e3b; border: 1px solid #313b4a;
+    border-radius: 18px 18px 6px 18px; padding: 10px 16px;
+    font-size: 14.5px;
   }
+  .m-msg.user p { margin: 0; }
+  .m-msg.user p + p { margin-top: 8px; }
   .m-msg.bot { align-self: stretch; width: 100%; }
   .m-msg.bot p { margin: 0 0 10px; }
   /* настоящие блочные элементы разметки */
@@ -551,24 +575,39 @@
     align-self: center; font-size: 12px; color: var(--green); background: var(--green-dim);
     padding: 4px 12px; border-radius: 10px; border: 1px solid rgba(16,185,129,.3);
   }
-  .m-chips { display: flex; gap: 8px; padding: 10px 16px 0; flex-wrap: wrap; }
+  .m-chips { display: flex; gap: 8px; padding: 12px 18px 0; flex-wrap: wrap; }
   .m-chip {
-    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
-    border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+    border: 1px solid var(--border); background: transparent; color: var(--muted);
+    border-radius: 999px; padding: 6px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+    transition: all .15s;
   }
-  .m-chip:hover { color: var(--green); border-color: rgba(16,185,129,.4); }
-  .m-inputrow { display: flex; gap: 8px; padding: 10px 16px 8px; align-items: flex-end; }
+  .m-chip:hover { color: var(--green); border-color: rgba(16,185,129,.45); background: var(--green-dim); }
+  .m-inputrow { display: flex; gap: 10px; padding: 12px 18px 14px; align-items: flex-end; }
   .m-inp {
     flex: 1; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 14px;
-    resize: vertical; min-height: 44px; line-height: 1.4;
+    border-radius: 14px; padding: 12px 15px; font-family: inherit; font-size: 14.5px;
+    resize: none; min-height: 48px; max-height: 170px; line-height: 1.5;
+    transition: border-color .15s, box-shadow .15s;
+    overflow: hidden;   /* рост высоты делает JS; скролл внутри только после max */
   }
-  .m-inp:focus { outline: none; border-color: rgba(16,185,129,.5); }
+  .m-inp:focus { outline: none; border-color: rgba(16,185,129,.55); box-shadow: 0 0 0 3px rgba(16,185,129,.09); overflow-y: auto; }
   .m-attach {
     background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
-    border-radius: 10px; width: 44px; height: 44px; cursor: pointer; font-size: 18px; flex: none;
+    border-radius: 50%; width: 44px; height: 44px; cursor: pointer; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 17px;
+    transition: all .15s;
   }
   .m-attach:hover { color: var(--green); border-color: rgba(16,185,129,.4); }
+  .m-send {
+    flex: none; width: 44px; height: 44px; border-radius: 50%; border: none;
+    background: var(--green); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .12s, background .12s, box-shadow .12s;
+    box-shadow: 0 3px 14px rgba(16,185,129,.28);
+  }
+  .m-send:hover { background: #0ea371; transform: translateY(-1px); box-shadow: 0 5px 18px rgba(16,185,129,.38); }
+  .m-send:active { transform: translateY(0); }
+  .m-send:disabled { opacity: .45; cursor: default; transform: none; }
   .m-attach-row { display: flex; align-items: center; gap: 10px; padding: 0 16px 8px; }
   .m-attach-row[hidden] { display: none; }   /* display:flex перебивает hidden */
   .m-attach-row img { width: 54px; height: 54px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
@@ -603,7 +642,7 @@
   }
   .m-pre::-webkit-scrollbar, .m-area::-webkit-scrollbar { width: 8px; }
   .m-pre::-webkit-scrollbar-thumb, .m-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  /* ---------- Наставник v1.9.2: подсветка кода ---------- */
+  /* ---------- Наставник v2.0: подсветка кода ---------- */
   .hl-c { color: #7d8590; font-style: italic; }      /* комментарии */
   .hl-s { color: #e3b341; }                          /* строки */
   .hl-k { color: #f97583; }                          /* ключевые слова */
@@ -642,27 +681,70 @@
     content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 88px;
     background: linear-gradient(rgba(22,27,34,0), var(--panel)); pointer-events: none;
   }
-  .m-msg.bot.m-typing { color: var(--muted); font-size: 13.5px; }
-  .m-msg.bot.m-typing .spinner { margin-right: 8px; }
+  .m-msg.bot.m-typing { color: var(--muted); font-size: 14px; display: flex; align-items: center; gap: 10px; }
+  .m-typing-dots { display: inline-flex; gap: 5px; align-items: center; }
+  .m-typing-dots i {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+    animation: mDot 1.25s infinite ease-in-out;
+  }
+  .m-typing-dots i:nth-child(2) { animation-delay: .16s; }
+  .m-typing-dots i:nth-child(3) { animation-delay: .32s; }
+  @keyframes mDot {
+    0%, 60%, 100% { opacity: .25; transform: translateY(0); }
+    30% { opacity: 1; transform: translateY(-4px); }
+  }
   .m-msg.bot.err {
     background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.35);
     border-radius: 12px; padding: 12px 14px;
   }
+  /* подпись модели под ответом (как в эталоне) */
   .m-meta {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    font-size: 11.5px; color: var(--muted); margin-top: 6px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    font-size: 11.5px; color: var(--muted); margin-top: 9px;
+  }
+  .m-model-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 2.5px 10px; font-size: 11px;
+  }
+  .m-model-tag i {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+    font-style: normal; flex: none;
   }
   .m-meta .m-copy {
     background: none; border: none; color: var(--muted); cursor: pointer;
     font-size: 11.5px; padding: 0; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
   }
   .m-meta .m-copy:hover { color: var(--green); }
   .m-expand {
     align-self: flex-start; background: none; border: 1px dashed var(--border);
     color: var(--muted); border-radius: 8px; padding: 3px 12px; font-size: 12px;
-    cursor: pointer; margin-top: 5px; font-family: inherit;
+    cursor: pointer; margin-top: 7px; font-family: inherit;
   }
   .m-expand:hover { color: var(--green); border-color: rgba(16,185,129,.5); }
+  /* кнопка «вниз» (как в эталоне появляется при прокрутке вверх) */
+  .m-jump {
+    position: absolute; right: 20px; bottom: 132px; z-index: 6;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    font-size: 16px; box-shadow: 0 6px 18px rgba(0,0,0,.45);
+    font-family: inherit; line-height: 1;
+  }
+  .m-jump.show { display: flex; }
+  .m-jump:hover { color: var(--green); border-color: rgba(16,185,129,.5); }
+  /* пустое состояние (приветствие) */
+  .m-empty { text-align: center; padding: 34px 18px 20px; margin: auto; }
+  .m-empty .big-ava {
+    width: 68px; height: 68px; border-radius: 50%; margin: 0 auto 16px;
+    background: linear-gradient(135deg, #10b981, #047857);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; box-shadow: 0 0 0 5px rgba(16,185,129,.12), 0 10px 30px rgba(16,185,129,.18);
+  }
+  .m-empty h4 { color: var(--text); font-size: 18px; margin-bottom: 7px; }
+  .m-empty p { font-size: 13.5px; color: var(--muted); max-width: 500px; margin: 0 auto 20px; line-height: 1.6; }
+  .m-empty-caps { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   /* ---------- большие вставки пользователя ---------- */
   .m-paste {
     align-self: flex-end; max-width: 78%; background: var(--panel2);
@@ -699,6 +781,17 @@
   .m-plan-h { font-size: 15px; font-weight: 700; margin: 10px 0 4px; }
   .m-plan-h:first-child { margin-top: 0; }
   .m-plan-p { margin: 2px 0; }
+  /* ---------- адаптив чата ---------- */
+  @media (max-width: 720px) {
+    .m-chat-card { height: calc(100vh - 300px); min-height: 460px; }
+    .m-msgs { padding: 18px 12px 10px; gap: 20px; }
+    .m-row { gap: 9px; }
+    .m-ava-sm { width: 29px; height: 29px; font-size: 14px; }
+    .m-msg.user { max-width: 90%; }
+    .m-chips { padding: 10px 12px 0; }
+    .m-inputrow { padding: 10px 12px 12px; gap: 8px; }
+    .m-jump { right: 14px; bottom: 128px; }
+  }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 18px 0 26px; }
 </style>
 </head>
@@ -876,13 +969,16 @@
       <div class="card m-chat-card">
         <div class="m-chat-head">
           <span class="m-ava">🤖</span>
-          <div class="m-who"><b>Наставник</b><span id="mentorModelLbl">Личный ИИ-помощник по фронтенду</span></div>
+          <div class="m-who"><b>Наставник</b>
+            <span><i class="m-dot" aria-hidden="true"></i><span id="mentorModelLbl">Личный ИИ-помощник по фронтенду</span></span>
+          </div>
           <span class="right">
             <button class="btn btn-ghost" id="mentorClearChat" style="padding:7px 14px">Очистить чат</button>
           </span>
         </div>
         <div id="mentorWizard" class="m-wizard" hidden></div>
         <div class="m-msgs" id="mentorMsgs"></div>
+        <button class="m-jump" id="mentorJump" title="Прокрутить вниз" aria-label="Прокрутить вниз">↓</button>
         <div class="m-chips">
           <button class="m-chip" data-mode="code">🔎 Разбор кода</button>
           <button class="m-chip" data-mode="layout">🖼 Разбор макета</button>
@@ -890,10 +986,15 @@
           <button class="m-chip" data-mode="task">🎯 Задача на завтра</button>
         </div>
         <div class="m-inputrow">
-          <button class="m-attach" id="mentorAttachBtn" title="Прикрепить фото макета (или Ctrl+V)">📎</button>
-          <textarea id="mentorInput" class="m-inp" rows="2"
-                    placeholder="Напишите наставнику… Пришлите код, фото макета или нажмите кнопку ниже. Ctrl+Enter — отправить"></textarea>
-          <button class="btn" id="mentorSendBtn" style="padding:10px 18px" title="Отправить">➤</button>
+          <button class="m-attach" id="mentorAttachBtn" title="Прикрепить фото макета (или Ctrl+V)" aria-label="Прикрепить фото макета">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <textarea id="mentorInput" class="m-inp" rows="1"
+                    placeholder="Напишите наставнику…"
+                    title="Пришлите код, фото макета или нажмите кнопку режима ниже. Ctrl+Enter — отправить"></textarea>
+          <button class="m-send" id="mentorSendBtn" title="Отправить (Ctrl+Enter)" aria-label="Отправить">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4l17.45-7.48c.81-.35.81-1.49 0-1.84L3.4 3.6c-.66-.29-1.39.2-1.39.91L2 9.12c0 .5.37.93.87.99L17 12 2.87 13.88c-.5.07-.87.5-.87 1l.01 4.61c0 .71.73 1.2 1.39.91z"/></svg>
+          </button>
         </div>
         <div class="m-attach-row" id="mentorAttachRow" hidden>
           <img id="mentorAttachThumb" alt="Прикреплённый макет">
@@ -945,6 +1046,7 @@
         <div class="m-fld"><span>Провайдер — подставит адрес и модели, можно поменять</span>
           <select class="inp" id="mPreset" style="max-width:420px">
             <option value="">— выберите —</option>
+            <option value="gemini">Google Gemini — БЕСПЛАТНЫЙ ключ за 2 мин (aistudio.google.com/apikey), с фото</option>
             <option value="github">GitHub Models — БЕСПЛАТНО по вашему GitHub-токену (с фото)</option>
             <option value="zai">Z.ai (GLM-4.6, дешёвый и быстрый)</option>
             <option value="openrouter">OpenRouter (много моделей, есть бесплатные)</option>
@@ -1544,16 +1646,16 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: 'ivanov/CodeTime',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '1.9.3' };
+             version: '2.0.0' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '1.9.3', latest: '1.9.4',
-             tagName: 'v1.9.4', available: true,
+    return { configured: true, current: '2.0.0', latest: '2.0.0',
+             tagName: 'v2.0.0', available: false,
              assetName: 'CodeTime.exe', assetSize: 22048000,
-             releaseUrl: '#', notes: 'Чат Наставника перерисован как в референсе: ответы без «пузырей», настоящие списки/таблицы/цитаты, чек-листы с галочками, код с подсветкой и копированием, кнопка «Копировать ответ», подпись модели под ответом, чат стал выше' };
+             releaseUrl: '#', notes: 'Альфа: чат Наставника в стиле эталона — аватар у каждого ответа, пузыри сообщений, индикатор набора, кнопка «вниз», подпись провайдера и модели под ответом; ключ Gemini и новые фолбэки ИИ-цепочки' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '1.9.3', releases: demoReleases() };
+    return { configured: true, current: '2.0.0', releases: demoReleases() };
   }
   return undefined;
 }
@@ -2889,9 +2991,12 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
+    { tag: 'v2.0.0', version: '2.0.0', date: '2026-10-05', assetSize: 22075000,
+      notes: 'АЛЬФА: чат Наставника в стиле эталона — аватар у каждого ответа, пузыри сообщений, индикатор набора, кнопка «вниз», подпись провайдера и модели (Gemini / GitHub Models / свой ключ / резерв) под каждым ответом; свой бесплатный ключ Gemini в один клик; умные фолбэки ИИ-цепочки и честные ошибки.',
+      relation: 'current' },
     { tag: 'v1.9.4', version: '1.9.4', date: '2026-10-05', assetSize: 22075000,
-      notes: 'Чат Наставника перерисован «как у эталона»: ответы наставника — чистый текст без рамки, сообщения пользователя — нейтральные пузыри; настоящая блочная разметка (абзацы, заголовки, списки с вложенностью, чек-листы с галочками, цитаты, таблицы); код-блоки в тёмной теме с подсветкой и копированием; кнопка «Копировать ответ» и подпись модели под каждым ответом (видна и у свёрнутых); чат стал выше; длинные ответы сворачиваются с плавной шторкой.',
-      relation: 'newer' },
+      notes: 'Чат Наставника перерисован «как у эталона»: ответы наставника — чистый текст без рамки, сообщения пользователя — нейтральные пузыри; настоящая блочная разметка; код-блоки в тёмной теме с подсветкой и копированием; длинные ответы сворачиваются с плавной шторкой.',
+      relation: 'older' },
     { tag: 'v1.9.3', version: '1.9.3', date: '2026-10-05', assetSize: 22070000,
       notes: 'Чат Наставника перерисован «как у эталона»: ответы без рамки, блочная разметка, код-блоки с подсветкой, «Копировать ответ», подпись модели.',
       relation: 'older' },
@@ -3016,7 +3121,7 @@ $('installBtn').addEventListener('click', function () {
 // список версий — один раз при открытии приложения (не спамим GitHub в 30-сек цикле)
 loadReleases(true);
 
-// ---------- Наставник (ИИ-помощник, v1.9.4) ----------
+// ---------- Наставник (ИИ-помощник, v2.0) ----------
 
 var M = {
   ready: false,          // инициализация выполнена один раз
@@ -3039,6 +3144,7 @@ var M_MODE_HINT = {
 
 var M_PRESETS = {
   github:     { base: 'https://models.github.ai/inference', model: 'openai/gpt-4.1-mini', vision: 'openai/gpt-4.1-mini' },
+  gemini:     { base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash', vision: 'gemini-2.5-flash' },
   zai:        { base: 'https://api.z.ai/api/paas/v4', model: 'glm-4.6', vision: 'glm-4.5v' },
   openrouter: { base: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.5-flash', vision: 'google/gemini-2.5-flash' },
   vsegpt:     { base: 'https://api.vsegpt.ru/v1', model: 'openai/gpt-4o-mini', vision: 'openai/gpt-4o-mini' },
@@ -3063,6 +3169,14 @@ function mentorInit() {
   mentorLoadStatus();
   mentorRestoreChat();
   mentorPane('chat');
+  mentorAutoSize();   // подогнать поле ввода под placeholder/шрифт
+}
+
+function mentorAutoSize() {
+  var i = $('mentorInput');
+  if (!i) return;
+  i.style.height = 'auto';
+  i.style.height = Math.max(48, Math.min(i.scrollHeight, 170)) + 'px';
 }
 
 function mentorModeLabel(s) {
@@ -3111,15 +3225,22 @@ function mentorRenderWizard() {
       ? 'Модель <code>' + esc(s.geminiModel || 'gemini-2.5-flash') + '</code> по встроенному демо-ключу: бесплатно и понимает фото макетов. Если Google ограничит доступ из вашего региона — автоматически включится резервная модель.'
       : 'Резервная модель <code>' + esc(s.demoModel || 'openai-fast') + '</code>: текст и код разбирает, фото — нет.' +
         (s.geminiReason ? ' Встроенный Gemini недоступен: ' + esc(s.geminiReason) + '.' : '') +
-        ' Через час она попробует Gemini снова, либо подключите GitHub-токен ниже.';
+        ' Через час она попробует Gemini снова, либо подключите свой ключ (шаг ниже — 2 минуты).';
     steps.push('<div class="m-step"><b>' + demoTitle + '</b>' +
       '<p style="margin:6px 0">' + demoText +
-      ' Для чтения вашего репозитория и личных лимитов подключите GitHub-токен (шаг ниже) или свой ключ в Настройках.</p>' +
+      ' Для чтения вашего репозитория и личных лимитов подключите свой ключ или GitHub-токен (шаги ниже).</p>' +
       '<div class="m-wz-actions">' +
       '<button class="btn wz-demo" style="padding:8px 16px">Писать в чат</button>' +
-      '<button class="btn btn-ghost wz-go-settings" style="padding:8px 16px">Настроить GitHub-ИИ</button>' +
+      '<button class="btn btn-ghost wz-go-gemini" style="padding:8px 16px">Свой ключ Gemini (2 мин)</button>' +
+      '<button class="btn btn-ghost wz-go-settings" style="padding:8px 16px">Другие способы</button>' +
       '</div></div>');
   }
+  steps.push('<div class="m-step"><b>Шаг — свой бесплатный ключ Gemini (рекомендуется): фото макетов + надёжный ИИ</b>' +
+      '<ol><li>Откройте <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a> (нужен аккаунт Google).</li>' +
+      '<li>«Create API key» → скопируйте ключ <code>AIza…</code>.</li>' +
+      '<li>Вставьте его в «Ключ API» ниже или в Настройках Наставника → Сохранить. Бесплатный тариф: десятки запросов в день, с фото.</li></ol>' +
+      '<div class="m-wz-actions"><button class="btn wz-go-gemini" style="padding:8px 16px">Открыть настройки</button>' +
+      '<a class="btn btn-ghost" style="padding:8px 16px;text-decoration:none" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Получить ключ ↗</a></div></div>');
   if (!s.hasGhToken) {
     steps.push('<div class="m-step"><b>Шаг — GitHub-токен: фото макетов + чтение вашего кода + ИИ без лимитов демо</b>' +
       '<ol><li>GitHub: <b>Settings → Developer settings → Personal access tokens → Fine-grained → Generate new token</b>.</li>' +
@@ -3144,10 +3265,16 @@ $('mentorWizard').addEventListener('click', function (e) {
   if (e.target.closest('.wz-demo')) {
     try { localStorage.setItem('mentorWizDone', '1'); } catch (err) {}
     $('mentorWizard').hidden = true;
-    showToast('Демо-ИИ включён — пишите прямо в чат. Фото макетов: подключите GitHub-токен в Настройках (бесплатно).');
+    showToast('Демо-ИИ включён — пишите прямо в чат. Для фото макетов и лимитов получите свой ключ Gemini в Настройках (бесплатно, 2 минуты).');
     return;
   }
   if (e.target.closest('.wz-go-settings')) mentorPane('settings');
+  if (e.target.closest('.wz-go-gemini')) {
+    mentorPane('settings');
+    var ps = $('mPreset');
+    if (ps) { ps.value = 'gemini'; ps.dispatchEvent(new Event('change')); }
+    var kb = $('mKey'); if (kb) kb.focus();
+  }
 });
 
 function mentorRestoreChat() {
@@ -3155,6 +3282,7 @@ function mentorRestoreChat() {
     M.msgs = (h.messages || []).map(function (m) {
       return { role: m.role === 'assistant' ? 'assistant' : 'user',
                text: m.content || '', model: m.model || null,
+               mode: m.mode || null,
                time: m.ts ? String(m.ts).slice(11, 16) : null };
     });
     mentorRenderMsgs();
@@ -3410,13 +3538,30 @@ function isBigText(t) {
   return msgWords(t) > 100 || String(t || '').length > 700;
 }
 
+function providerLabel(mode) {
+  if (mode === 'gemini') return 'Gemini';
+  if (mode === 'github') return 'GitHub Models';
+  if (mode === 'key') return 'Свой ключ';
+  if (mode === 'demo') return 'Резерв';
+  return '';
+}
+
+function mdRenderUser(s) {
+  // в пузыре пользователя — чистый текст: переносы строк и `код`, без блоков
+  return esc(String(s || ''))
+    .replace(/`([^`\n]+)`/g, function (_, c) { return '<code>' + c + '</code>'; })
+    .replace(/\n/g, '<br>');
+}
+
 function mentorMsgHtml(m, i) {
   if (m.role === 'user') {
     var att = m.img ? '<img class="m-att" src="' + m.img + '" alt="прикреплённый макет">' : '';
-    if (!isBigText(m.text)) return '<div class="m-msg user">' + att + mdRender(m.text) + '</div>';
-    // большая вставка → компактная карточка «Вставленный текст» (как в референсе)
+    if (!isBigText(m.text)) {
+      return '<div class="m-row u-row"><div class="m-msg user">' + att + mdRenderUser(m.text) + '</div></div>';
+    }
+    // большая вставка → компактная карточка «Вставленный текст» (как в эталоне)
     var nLines = String(m.text).split('\n').length;
-    return '<div class="m-paste" data-idx="' + i + '">' +
+    return '<div class="m-row u-row"><div class="m-paste" data-idx="' + i + '">' +
       '<div class="m-paste-head"><span class="m-paste-ic">📄</span>' +
       '<span class="m-paste-tit"><b>Вставленный текст</b><span>' +
       fmtBytes(byteLen(m.text)) + ' · ' + nLines + ' ' +
@@ -3425,29 +3570,47 @@ function mentorMsgHtml(m, i) {
       '<button type="button" class="m-paste-btn" data-act="toggle">Показать</button>' +
       '<button type="button" class="m-paste-btn" data-act="txt">Скачать .txt</button>' +
       '</span></div>' +
-      '<pre class="m-paste-body" hidden>' + esc(m.text) + '</pre>' + att + '</div>';
+      '<pre class="m-paste-body" hidden>' + esc(m.text) + '</pre>' + att + '</div></div>';
   }
-  // подпись модели под ответом (вне сворачиваемой части) + кнопка «Копировать ответ»
-  var meta = '<div class="m-meta">' +
-    (m.model ? '<span title="Модель, которая ответила">🤖 ' + esc(m.model) + '</span>' : '<span>🤖 Наставник</span>') +
-    (m.time ? '<span>' + esc(m.time) + '</span>' : '') +
-    '<button type="button" class="m-copy" data-act="copy-msg" data-idx="' + i + '">Копировать ответ</button>' +
+  // ответ: аватар + имя + время + разметка + подпись модели (как в эталоне)
+  var prov = providerLabel(m.mode);
+  var modelTag = m.model
+    ? '<span class="m-model-tag" title="Модель, которая ответила"><i aria-hidden="true"></i>' +
+      (prov ? esc(prov) + ' · ' : '') + esc(m.model) + '</span>'
+    : '<span class="m-model-tag"><i aria-hidden="true"></i>Наставник</span>';
+  var meta = '<div class="m-meta">' + modelTag +
+    (m.time ? '<time>' + esc(m.time) + '</time>' : '') +
+    '<button type="button" class="m-copy" data-act="copy-msg" data-idx="' + i + '">⧉ Копировать ответ</button>' +
     '</div>';
   var body = m.error ? esc(m.text) : mdRender(m.text);
-  return '<div class="m-wrap"><div class="m-msg bot' + (m.error ? ' err' : '') +
-    '" data-idx="' + i + '">' + body + '</div>' + meta + '</div>';
+  return '<div class="m-row b-row">' +
+    '<span class="m-ava-sm" aria-hidden="true">🤖</span>' +
+    '<div class="m-col">' +
+      '<div class="m-msg-head"><b>Наставник</b>' +
+      (m.time ? '<time>' + esc(m.time) + '</time>' : '') + '</div>' +
+      '<div class="m-msg bot' + (m.error ? ' err' : '') + '" data-idx="' + i + '">' + body + '</div>' +
+      meta +
+    '</div></div>';
+}
+
+function mentorWelcomeHtml() {
+  return '<div class="m-empty">' +
+    '<div class="big-ava" aria-hidden="true">🤖</div>' +
+    '<h4>Привет! Я твой Наставник</h4>' +
+    '<p>Личный тренер по фронтенду: разбираю код и макеты по фото, веду журнал прогресса, ставлю задачи на завтра. Память хранится у тебя на ПК — я помню всё между разговорами.</p>' +
+    '<div class="m-empty-caps">' +
+    '<button class="m-chip" data-mode="code">🔎 Разбор кода</button>' +
+    '<button class="m-chip" data-mode="layout">🖼 Разбор макета</button>' +
+    '<button class="m-chip" data-mode="dayend">🏁 Конец дня</button>' +
+    '<button class="m-chip" data-mode="task">🎯 Задача на завтра</button>' +
+    '</div></div>';
 }
 
 function mentorRenderMsgs() {
   var box = $('mentorMsgs');
   if (!M.msgs.length) {
-    box.innerHTML = '<div class="m-wrap"><div class="m-msg bot"><p>Привет! Я твой Наставник — личный тренер по фронтенду.</p>' +
-      '<p>Что умею:</p><ul>' +
-      '<li><b>Разбор кода</b> — bugs → семантика → адаптив → структура CSS, с «ДО/ПОСЛЕ» на твоём коде;</li>' +
-      '<li><b>Разбор макета</b> — пришли фото, а потом «разбор кода» сверит вёрстку с этим макетом;</li>' +
-      '<li><b>Конец дня</b> — честный вердикт с оценкой и записью в журнал;</li>' +
-      '<li><b>Задача на завтра</b> и <b>«запомни …»</b> — сохраню в заметки.</li>' +
-      '</ul><p>Настрой меня один раз — и я буду помнить всё между разговорами.</p></div></div>';
+    box.innerHTML = mentorWelcomeHtml();
+    $('mentorJump').classList.remove('show');
     return;
   }
   box.innerHTML = M.msgs.map(mentorMsgHtml).join('') +
@@ -3458,20 +3621,30 @@ function mentorRenderMsgs() {
     var idx = el.dataset.idx;
     if (el.scrollHeight > M_COLLAPSE_PX + 40 && !M.expanded[idx]) {
       el.classList.add('m-collapsed');
-      var wrap = el.parentElement;
-      if (wrap && !wrap.querySelector('.m-expand')) {
+      var col = el.closest('.m-col');
+      if (col && !col.querySelector('.m-expand')) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'm-expand';
         btn.textContent = 'Показать полностью';
         btn.dataset.idx = idx;
-        var metaEl = wrap.querySelector('.m-meta');
-        if (metaEl) wrap.insertBefore(btn, metaEl);   // кнопка над подписью модели
-        else wrap.appendChild(btn);
+        var metaEl = col.querySelector('.m-meta');
+        if (metaEl) col.insertBefore(btn, metaEl);   // кнопка над подписью модели
+        else col.appendChild(btn);
       }
     }
   });
-  box.scrollTop = box.scrollHeight;
+  mentorScrollBottom();
+}
+
+function mentorScrollBottom(smooth) {
+  var box = $('mentorMsgs');
+  box.scrollTo({ top: box.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+function mentorNearBottom() {
+  var box = $('mentorMsgs');
+  return box.scrollHeight - box.scrollTop - box.clientHeight < 90;
 }
 
 function copyText(txt, okMsg) {
@@ -3502,7 +3675,7 @@ $('mentorMsgs').addEventListener('click', function (e) {
   if (exp) {
     var idx = exp.dataset.idx;
     M.expanded[idx] = !M.expanded[idx];
-    var bubble = exp.parentElement.querySelector('.m-msg.bot[data-idx="' + idx + '"]');
+    var bubble = exp.closest('.m-col').querySelector('.m-msg.bot[data-idx="' + idx + '"]');
     if (bubble) {
       var collapsed = bubble.classList.toggle('m-collapsed', !M.expanded[idx]);
       exp.textContent = collapsed ? 'Показать полностью' : 'Свернуть';
@@ -3510,6 +3683,9 @@ $('mentorMsgs').addEventListener('click', function (e) {
     }
     return;
   }
+  // чипы в приветствии — тоже запускают режимы
+  var wchip = e.target.closest('.m-empty .m-chip[data-mode]');
+  if (wchip) { mentorSend(wchip.dataset.mode); return; }
   var cp = e.target.closest('.m-code-copy');
   if (cp) {
     var pre = cp.closest('pre');
@@ -3556,14 +3732,18 @@ function mentorSend(mode) {
   M.sending = true;
   M.journalNote = null;
   inp.value = '';
+  inp.style.height = 'auto';
   mentorClearAttach();
   mentorRenderMsgs();
   var box = $('mentorMsgs');
   var think = document.createElement('div');
-  think.className = 'm-wrap';
-  think.innerHTML = '<div class="m-msg bot m-typing"><span class="spinner"></span>Думаю, не закрывайте вкладку…</div>';
+  think.className = 'm-row b-row';
+  think.innerHTML = '<span class="m-ava-sm" aria-hidden="true">🤖</span>' +
+    '<div class="m-col"><div class="m-msg-head"><b>Наставник</b></div>' +
+    '<div class="m-msg bot m-typing"><span class="m-typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
+    'Думаю, не закрывайте вкладку…</div></div>';
   box.appendChild(think);
-  box.scrollTop = box.scrollHeight;
+  mentorScrollBottom(true);
   apiPost('/api/mentor/chat', payload).then(function (r) {
     var notes = [];
     if (r.journalSaved) notes.push('📝 Записано в journal.md (Журнал)');
@@ -3572,7 +3752,7 @@ function mentorSend(mode) {
     M.journalNote = notes.length ? '<div class="m-note">' + notes.join(' · ') + '</div>' : null;
     var d = new Date();
     M.msgs.push({ role: 'assistant', text: r.reply || '(пустой ответ)',
-                  model: r.model || null,
+                  model: r.model || null, mode: r.mode || null,
                   time: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) });
   }).catch(function (e) {
     M.msgs.push({ role: 'assistant', error: true,
@@ -3867,6 +4047,19 @@ $('mentorInput').addEventListener('keydown', function (e) {
     mentorSend(null);
   }
 });
+
+// авто-рост поля ввода (как в эталоне: поле растёт до ~6 строк)
+$('mentorInput').addEventListener('input', function () {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 170) + 'px';
+});
+window.addEventListener('resize', mentorAutoSize);
+
+// кнопка «вниз»: видна, когда ушли от конца ленты
+$('mentorMsgs').addEventListener('scroll', function () {
+  $('mentorJump').classList.toggle('show', !mentorNearBottom());
+});
+$('mentorJump').addEventListener('click', function () { mentorScrollBottom(true); });
 
 $('mentorAttachBtn').addEventListener('click', function () { $('mentorFile').click(); });
 

@@ -92,8 +92,12 @@ DEFAULT_CONFIG = {
 # при исчерпании (429) или региональной блокировке цепочка уходит в резерв.
 GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai'
 GEMINI_DEMO_KEY = 'REDACTED_LEAKED_KEY'
-GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash-lite']
-GEMINI_DISABLE_MIN = 60   # пауза после региональной блокировки, минут
+# Порядок моделей: та, что реально отвечает у большинства, — первая.
+# Если Google сменит каталог — студент вписывает свою в Настройках.
+GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash',
+                 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
+GEMINI_DISABLE_MIN = 60   # пауза после региональной блокировки/блокировки ключа, минут
+GEMINI_GET_KEY_URL = 'aistudio.google.com/apikey'
 
 # --- Резерв: бесплатная публичная модель, вообще БЕЗ ключей ----------
 # Pollinations, anonymous tier. Параметр referrer обязателен: без него
@@ -487,14 +491,15 @@ def _gemini_blocked(st=None):
 def _llm_chain(cfg, force_gemini=False):
     """Список провайдеров по приоритету. Каждый:
     {mode, base, key, models, url_suffix, extra, timeout}.
-    Свой ключ — единственный провайдер (ошибки сообщаем как есть,
-    без тихих фолбэков: пользователь должен знать, что его ключ сломан)."""
-    if cfg['api_key'] and cfg['api_base']:
-        return [{'mode': 'key', 'base': cfg['api_base'].rstrip('/'),
-                 'key': cfg['api_key'],
-                 'models': [cfg['model'] or 'gpt-4o-mini'],
-                 'url_suffix': '/chat/completions', 'extra': {}, 'timeout': 150}]
+    Свой ключ — первый; если он упал НЕ по причине неверного ключа
+    (сеть, лимит, нет модели), цепочка честно уходит дальше по фолбэкам,
+    чтобы Наставник продолжал отвечать. Автор отвечает в подписи модели."""
     chain = []
+    if cfg['api_key'] and cfg['api_base']:
+        chain.append({'mode': 'key', 'base': cfg['api_base'].rstrip('/'),
+                      'key': cfg['api_key'],
+                      'models': [cfg['model'] or 'gpt-4o-mini'],
+                      'url_suffix': '/chat/completions', 'extra': {}, 'timeout': 150})
     if cfg['gh_token']:
         chain.append({'mode': 'github', 'base': GH_MODELS_BASE,
                       'key': cfg['gh_token'],
@@ -512,10 +517,9 @@ def _llm_chain(cfg, force_gemini=False):
                       'extra': {'temperature': 0.6}, 'timeout': 120})
     chain.append({'mode': 'demo', 'base': DEMO_LLM_BASE,
                   'key': '',
-                  # у анонимного тарифа Pollinations осталась одна модель
-                  # (алиас 'openai' дублирует её на случай смены имени)
-                  'models': list(dict.fromkeys(
-                      [DEMO_LLM_MODEL, 'openai'])),
+                  # анонимный тариф Pollinations: одна модель (алиас 'openai'
+                  # теперь отдаёт 402 — не тратим на него время)
+                  'models': [DEMO_LLM_MODEL],
                   'url_suffix': '',   # Pollinations: base уже включает /openai
                   'extra': {'referrer': DEMO_LLM_REFERRER}, 'timeout': 150})
     return chain
@@ -534,16 +538,19 @@ def _vision_available(cfg):
 
 def _classify_error(e):
     """Тип ошибки для маршрутизации фолбэков.
-    'region' — локация не поддержана; 'model404' — модели нет у провайдера;
-    'throttle' — лимит/перегрузка; 'auth' — ключ; 'net' — сеть/прочее."""
+    'region' — локация не поддержана; 'leak' — ключ помечен Google как утёкший;
+    'model404' — модели нет у провайдера; 'throttle' — лимит/перегрузка;
+    'auth' — ключ; 'net' — сеть/прочее."""
     s = str(e)
     if ('location is not supported' in s or 'FAILED_PRECONDITION' in s
             or 'User location' in s):
         return 'region'
+    if 'reported as leaked' in s:
+        return 'leak'
     if '404' in s:
         return 'model404'
     if ('402' in s or '429' in s or '500' in s or '502' in s or '503' in s
-            or 'перегружен' in s):
+            or 'перегружен' in s or 'no space left' in s):
         return 'throttle'
     if '401' in s or '403' in s:
         return 'auth'
@@ -610,8 +617,8 @@ def llm_chat(messages, model=None, timeout=None):
             if not m:
                 continue
             payload = dict(base_payload, model=m)
-            # резерв Pollinations: общий троттлинг по IP — одна пауза-повтор
-            attempts = (0, 22) if prov['mode'] == 'demo' else (0,)
+            # резерв Pollinations: общий троттлинг по IP — серия пауз-повторов
+            attempts = (0, 12, 30) if prov['mode'] == 'demo' else (0,)
             for delay in attempts:
                 if delay:
                     time.sleep(delay)
@@ -642,17 +649,45 @@ def llm_chat(messages, model=None, timeout=None):
                                         'региону, пауза %d минут',
                                         GEMINI_DISABLE_MIN)
                         break   # к следующему провайдеру
+                    if kind == 'leak':
+                        # демо-ключ попал в открытый доступ — Google его отключил.
+                        # Ставим паузу, чтобы каждый запрос не бился о 403.
+                        if prov['mode'] == 'gemini':
+                            _gemini_save({'disabled_until':
+                                          (datetime.now() +
+                                           timedelta(minutes=GEMINI_DISABLE_MIN))
+                                          .isoformat(timespec='seconds'),
+                                          'reason': 'Демо-ключ заблокирован Google '
+                                                    '(попал в открытый доступ). '
+                                                    'Получите свой бесплатный '
+                                                    'ключ: ' + GEMINI_GET_KEY_URL})
+                            logging.warning('Наставник: демо-ключ Gemini '
+                                            'заблокирован (leak), пауза %d минут',
+                                            GEMINI_DISABLE_MIN)
+                        if prov['mode'] == 'key':
+                            raise   # свой ключ утёк/отключён — говорим как есть
+                        break       # дальше по цепочке
                     if kind == 'model404':
                         break       # этой модели нет — пробуем следующую
+                    if kind == 'auth':
+                        # неверный ключ: свой — кричим сразу, остальные — дальше
+                        if prov['mode'] == 'key':
+                            raise
+                        break
                     if kind == 'throttle' and delay == attempts[-1]:
                         break       # лимит — следующая модель/провайдер
-                    if kind == 'auth':
-                        break
                     # сеть/прочее: у demo повтор с паузой, у прочих — дальше
         if last_err and str(last_err) not in seen_errs:
             seen_errs.append(str(last_err))
     if last_err:
         kind = _classify_error(last_err)
+        if kind == 'leak':
+            raise MentorError(
+                'Встроенный демо-ключ Gemini заблокирован Google (он попал в '
+                'открытый доступ). Это лечится своим бесплатным ключом за '
+                '2 минуты: ' + GEMINI_GET_KEY_URL + ' → «Create API key» → '
+                'вставить в Настройках Наставника. До этого работает резерв '
+                'без фото.')
         if kind == 'throttle' or kind == 'region':
             raise MentorError(
                 'Бесплатные ИИ перегружены или временно ограничены '
@@ -677,7 +712,8 @@ def _ver():
 
 def test_llm():
     """Проверка ИИ: прогоняет реальную цепочку (свой ключ > GitHub > Gemini >
-    резерв) и честно докладывает, какой режим работает, а какие упали и почему."""
+    резерв) и честно докладывает, какой режим работает, а какие упали и почему.
+    Для своего ключа попутно подтягивает список доступных моделей (/models)."""
     cfg = load_config()
     chain = _llm_chain(cfg, force_gemini=True)
     headers = {'User-Agent': 'CodeTime-Mentor/' + _ver(),
@@ -700,13 +736,37 @@ def test_llm():
                     _gemini_save({'model': m})
                 out = {'ok': True, 'mode': prov['mode'], 'model': m,
                        'models': []}
+                # свой ключ: покажем, какие модели вообще доступны —
+                # чтобы студент выбрал лучшую вместо случайной 404-й
+                if prov['mode'] == 'key':
+                    try:
+                        listing = _http_json(prov['base'] + '/models',
+                                             headers=h, timeout=20)
+                        ids = [str(x.get('id') or '')
+                               for x in (listing.get('data') or [])
+                               if isinstance(x, dict) and x.get('id')]
+                        out['models'] = ids[:15]
+                    except (MentorError, ValueError, TypeError, AttributeError):
+                        pass
                 if tried:
                     out['fallbackNote'] = ('Основной режим не ответил: '
                                            + '; '.join(t[:110] for t in tried))
                 return out
             except MentorError as e:
                 tried.append('%s/%s: %s' % (prov['mode'], m, str(e)[:110]))
-                if _classify_error(e) == 'region':
+                kind = _classify_error(e)
+                if kind == 'region':
+                    break
+                if kind == 'leak':
+                    if prov['mode'] == 'gemini':
+                        _gemini_save({'disabled_until':
+                                      (datetime.now() +
+                                       timedelta(minutes=GEMINI_DISABLE_MIN))
+                                      .isoformat(timespec='seconds'),
+                                      'reason': 'Демо-ключ заблокирован Google '
+                                                '(попал в открытый доступ). '
+                                                'Получите свой бесплатный '
+                                                'ключ: ' + GEMINI_GET_KEY_URL})
                     break
     raise MentorError('Ни один ИИ не ответил. ' + ' | '.join(tried[-3:]))
 
@@ -998,7 +1058,8 @@ def api_chat(data):
     today = datetime.now().strftime('%Y-%m-%d')
     try:
         _append_history(today, 'user', msg if msg else '(фото макета)')
-        _append_history(today, 'assistant', reply, model=used_model)
+        _append_history(today, 'assistant', reply,
+                        model=used_model, mode=used_mode)
     except OSError:
         logging.exception('Наставник: не сохранилась история')
 
@@ -1031,7 +1092,7 @@ def api_chat(data):
             'planSaved': plan_saved, 'model': used_model, 'mode': used_mode}
 
 
-def _append_history(day, role, content, model=None):
+def _append_history(day, role, content, model=None, mode=None):
     ensure_all()
     path = os.path.join(HISTORY_DIR, day + '.json')
     try:
@@ -1042,5 +1103,7 @@ def _append_history(day, role, content, model=None):
              'ts': datetime.now().isoformat(timespec='seconds')}
     if model:
         entry['model'] = model
+    if mode:
+        entry['mode'] = mode
     arr.append(entry)
     _write(path, json.dumps(arr[-200:], ensure_ascii=False))
