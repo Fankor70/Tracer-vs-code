@@ -55,7 +55,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '1.8.0'
+APP_VERSION = '1.8.1'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
@@ -1699,6 +1699,46 @@ def _clean_release_notes(text):
     return res
 
 
+def _download_exact(url, dst, expected_size=0, progress=None):
+    """Качает url в файл dst ДО ПОЛНОГО размера, иначе считает это ошибкой.
+
+    resp.read(n) может вернуть меньше n байт при обрыве соединения и
+    молча завершиться на EOF — так раньше получался ОБРЕЗАННЫЙ exe
+    (проверка 'MZ' проходила, файл вставлялся, приложение падало с
+    'Failed to load Python DLL'). Здесь читаем строго: пока не наберём
+    Content-Length (или expected_size) — считаем скачивание неудавшимся.
+    progress(proc, total) вызывается по мере скачивания (может быть None).
+    Возвращает количество скачанных байт."""
+    req = urllib.request.Request(url, headers={'User-Agent': 'CodeTime-updater'})
+    total = 0
+    with urllib.request.urlopen(req, timeout=120) as resp, \
+            open(dst, 'wb') as f:
+        cl = (resp.headers.get('Content-Length') or '').strip()
+        need = int(cl) if cl.isdigit() else int(expected_size or 0)
+        reported = -1
+        while True:
+            chunk = resp.read(1 << 16)
+            if not chunk:
+                break
+            f.write(chunk)
+            total += len(chunk)
+            if need and total > need:
+                raise IOError('сервер отдал больше данных, чем обещал '
+                              '(%d > %d байт)' % (total, need))
+            if progress and need:
+                pct = int(total * 100 / need)
+                if pct >= reported + 10:      # каждые ~10%
+                    reported = pct
+                    progress(total, need)
+        if need and total != need:
+            raise IOError('файл скачался не полностью: %d из %d байт '
+                          '(обрыв соединения)' % (total, need))
+    if expected_size and total != int(expected_size):
+        raise IOError('размер не совпал с каталогом GitHub: '
+                      'получено %d, ожидается %d байт' % (total, expected_size))
+    return total
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = 'CodeTime/' + APP_VERSION
 
@@ -2405,9 +2445,11 @@ class Handler(BaseHTTPRequestHandler):
     # ---------- POST: скачать обновление с GitHub и поставить ----------
 
     def _api_update_apply(self, data):
-        """Скачивает exe-ассет последнего релиза и запускает установку.
-        Тело: {assetUrl, assetName}. Ответ отдаётся сразу, скачивание
-        идёт в фоне — фронтенд опрашивает /api/settings до перезапуска."""
+        """Скачивает exe-ассет выбранного релиза и запускает установку.
+        Тело: {assetUrl, assetName, assetSize}. Ответ отдаётся сразу,
+        скачивание идёт в фоне — фронтенд опрашивает /api/update/status.
+        Скачивание идёт строго до полного размера (см. _download_exact)
+        с 3 попытками — обрезанный файл НЕ будет установлен."""
         if not getattr(sys, 'frozen', False):
             return self._json(
                 {'error': 'Обновление работает только в собранном приложении '
@@ -2421,30 +2463,53 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError('Скачивать обновление можно только с GitHub.')
         if not urlparse(url).path.lower().endswith('.exe'):
             raise ValueError('Файл обновления должен быть .exe.')
+        try:
+            expected = int(data.get('assetSize') or 0)
+        except (TypeError, ValueError):
+            expected = 0
         tmp_path = os.path.join(data_dir(), 'update.tmp')
 
         def worker():
+            last_err = None
+            for attempt in range(3):
+                if attempt:
+                    _upd_status('downloading',
+                                'Скачивание сорвалось — повторная попытка %d из 3…'
+                                % (attempt + 1))
+                    time.sleep(2.0)
+                try:
+                    size = _download_exact(
+                        url, tmp_path, expected_size=expected,
+                        progress=lambda done, need: _upd_status(
+                            'downloading',
+                            'Скачиваю обновление с GitHub: %d из %d МБ…'
+                            % (done // 1048576, max(1, need // 1048576))))
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    logging.warning('Скачивание обновления не удалось '
+                                    '(попытка %d): %r', attempt + 1, e)
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
+            if last_err is not None:
+                logging.exception('Обновление с GitHub НЕ удалось: %r', last_err)
+                _upd_status('error',
+                            'Не удалось скачать обновление (%s). Старая версия '
+                            'не тронута — попробуйте ещё раз.' % last_err)
+                return
             try:
-                _upd_status('downloading',
-                            'Скачиваю обновление с GitHub — не закрывайте приложение…')
-                req = urllib.request.Request(
-                    url, headers={'User-Agent': 'CodeTime-updater'})
-                with urllib.request.urlopen(req, timeout=300) as resp, \
-                        open(tmp_path, 'wb') as f:
-                    while True:
-                        chunk = resp.read(1 << 16)
-                        if not chunk:
-                            break
-                        f.write(chunk)
                 with open(tmp_path, 'rb') as f:
                     if f.read(2) != b'MZ':
                         raise ValueError('это не Windows-exe файл')
-                logging.info('Обновление с GitHub скачано (%d байт). Устанавливаю…',
-                             os.path.getsize(tmp_path))
+                logging.info('Обновление с GitHub скачано целиком (%d байт). '
+                             'Устанавливаю…', size)
                 self_update_apply(tmp_path)
             except Exception as e:
                 logging.exception('Обновление с GitHub НЕ удалось: %r', e)
-                _upd_status('error', 'Скачивание/установка не удалась: %r' % e)
+                _upd_status('error', 'Установка не удалась: %r' % e)
                 try:
                     os.remove(tmp_path)
                 except OSError:
@@ -2484,25 +2549,66 @@ def _write_update_bat(exe_dir, exe_name, stage_name):
     """Пишет codetime_update.bat (строго ASCII + CRLF) рядом с exe.
 
     Батник живёт рядом с exe и работает с ОТНОСИТЕЛЬНЫМИ путями через
-    cd /d "%~dp0" — поэтому в самом файле нет ни одного не-ASCII символа,
-    даже если папка пользователя названа кириллицей.
-    Алгоритм: цикл «попробовать скопировать новый exe поверх старого» —
-    пока старый процесс жив, Windows не даёт перезаписать запущенный exe
-    (копирование возвращает ошибку), как только приложение закрылось,
-    копия проходит, батник стартует новый exe и удаляет сам себя.
+    cd /d "%~dp0" — в файле нет ни одного не-ASCII символа, даже если
+    папка пользователя названа кириллицей.
+
+    Алгоритм (максимально защищённый от «после обновления не запускается»):
+      1) БЭКПАП: старый exe копируется в CodeTime.exe.old (читать
+         запущенный exe можно — заблокирована только перезапись);
+      2) цикл: ждём выхода приложения, копируем новый exe поверх
+         старого и СВЕРЯЕМ РАЗМЕРЫ (антивирус может мешать копированию);
+      3) запускаем новый exe и до ~30 секунд ждём, пока поднимется
+         локальный сервер на порту 5731;
+      4) если сервер НЕ поднялся (битый файл, антивирус, обрыв
+         скачивания) — АВТОМАТИЧЕСКИ возвращаем CodeTime.exe.old на
+         место и запускаем старую рабочую версию;
+      5) удаляем временный exe и сам батник.
     """
-    bat = '\r\n'.join([
+    bat_tpl = '\r\n'.join([
         '@echo off',
+        'rem CodeTime self-update: backup, swap, verify, health-check, auto-rollback',
         'cd /d "%~dp0"',
+        'copy /y "@EXE@" "@EXE@.old" >nul 2>&1',
+        'set /a CT_TRIES=0',
         ':wait',
         'ping -n 2 127.0.0.1 >nul',
-        'copy /y "%s" "%s" >nul 2>&1' % (stage_name, exe_name),
+        'set /a CT_TRIES+=1',
+        'if %CT_TRIES% GTR 90 goto finish',
+        'copy /y "@STAGE@" "@EXE@" >nul 2>&1',
         'if errorlevel 1 goto wait',
-        'del /f /q "%s" >nul 2>&1' % stage_name,
-        'start "" "%s"' % exe_name,
+        'for %%A in ("@STAGE@") do set CT_S1=%%~zA',
+        'for %%B in ("@EXE@") do set CT_S2=%%~zB',
+        'if not "%CT_S1%"=="%CT_S2%" goto wait',
+        'del /f /q "@STAGE@" >nul 2>&1',
+        'start "" "@EXE@"',
+        'set /a CT_H=0',
+        ':health',
+        'ping -n 3 127.0.0.1 >nul',
+        'set /a CT_H+=1',
+        'if %CT_H% GTR 15 goto rollback',
+        'powershell -NoProfile -Command "try{$c=New-Object Net.Sockets.TcpClient(\'127.0.0.1\',@PORT@);$c.Close();exit 0}catch{exit 1}" >nul 2>&1',
+        'if errorlevel 1 goto health',
         'del /f /q "%~f0" >nul 2>&1',
+        'exit /b 0',
+        ':rollback',
+        'taskkill /f /im "@EXE@" >nul 2>&1',
+        'ping -n 3 127.0.0.1 >nul',
+        'copy /y "@EXE@.old" "@EXE@" >nul 2>&1',
+        'start "" "@EXE@"',
+        'del /f /q "%~f0" >nul 2>&1',
+        'exit /b 0',
+        ':finish',
+        'tasklist /FI "IMAGENAME eq @EXE@" 2>nul | find /I "@EXE@" >nul',
+        'if errorlevel 1 start "" "@EXE@"',
+        'del /f /q "@STAGE@" >nul 2>&1',
+        'del /f /q "%~f0" >nul 2>&1',
+        'exit /b 0',
         '',
     ])
+    bat = (bat_tpl
+           .replace('@EXE@', exe_name)
+           .replace('@STAGE@', stage_name)
+           .replace('@PORT@', str(PORT)))
     bat_path = os.path.join(exe_dir, 'codetime_update.bat')
     with open(bat_path, 'w', encoding='ascii', newline='') as f:
         f.write(bat)

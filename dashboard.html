@@ -762,7 +762,7 @@
 <div class="ct-tooltip" id="ctTip"></div>
 <div class="toast" id="toast"></div>
 
-<footer>CodeTime v1.6 — локальный трекер времени в VS Code · данные в %APPDATA%\CodeTime</footer>
+<footer>CodeTime <span id="footVersion">v1.8</span> — локальный трекер времени в VS Code · данные в %APPDATA%\CodeTime</footer>
 
 <script>
 'use strict';
@@ -1118,13 +1118,16 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: 'ivanov/CodeTime',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '1.6.0' };
+             version: '1.8.0' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '1.6.0', latest: '1.6.1',
-             tagName: 'v1.6.1', available: true,
-             assetName: 'CodeTime.exe', assetSize: 18943232,
-             releaseUrl: '#', notes: 'Правки адаптива, обновление через GitHub' };
+    return { configured: true, current: '1.8.0', latest: '1.8.1',
+             tagName: 'v1.8.1', available: true,
+             assetName: 'CodeTime.exe', assetSize: 21954560,
+             releaseUrl: '#', notes: 'Надёжное обновление: докачка до точного размера, бэкап и автооткат' };
+  }
+  if (p === '/api/update/releases') {
+    return { configured: true, current: '1.8.0', releases: demoReleases() };
   }
   return undefined;
 }
@@ -2302,6 +2305,8 @@ function renderSettings(s) {
   $('autostart').checked = !!s.autostart;
   $('dbPath').textContent = s.dbPath || '';
   $('curVersion').textContent = s.version || '—';
+  var fv = document.getElementById('footVersion');
+  if (fv && s.version) fv.textContent = 'v' + s.version.split('.').slice(0, 2).join('.');
 }
 
 function loadSettings() {
@@ -2456,19 +2461,33 @@ function fillReleases(preferVer) {
   renderRelNotes();
 }
 
+function demoReleases() {
+  return [
+    { tag: 'v1.8.1', version: '1.8.1', date: '2026-10-04', assetSize: 21 * 1048576,
+      notes: 'Надёжное обновление: докачка до точного размера, бэкап и автооткат, если новая версия не стартовала.',
+      relation: 'newer' },
+    { tag: 'v1.8.0', version: '1.8.0', date: '2026-10-04', assetSize: 21 * 1048576,
+      notes: 'Выбор любой версии и откат; новый надёжный установщик; Проекты: период работы.',
+      relation: 'current' },
+    { tag: 'v1.7.0', version: '1.7.0', date: '2026-10-03', assetSize: 21 * 1048576,
+      notes: 'План: время и статус закреплены за шагом.', relation: 'older' }
+  ];
+}
+
+// в предпросмотре установка недоступна — кнопку блокируем с понятной подписью
+function demoLockInstall() {
+  var ib = $('installBtn');
+  ib.disabled = true;
+  ib.textContent = '⬇ Установить (только в приложении)';
+}
+
 function loadReleases(silent) {
   if (DEMO) {
-    RELEASES = [
-      { tag: 'v1.8.0', version: '1.8.0', date: '2026-10-04', assetSize: 21 * 1048576,
-        notes: 'Выбор любой версии и откат; новый надёжный установщик; Проекты: период работы.',
-        relation: 'newer' },
-      { tag: 'v1.7.0', version: '1.7.0', date: '2026-10-03', assetSize: 21 * 1048576,
-        notes: 'План: время и статус закреплены за шагом.', relation: 'older' },
-      { tag: 'v1.6.0', version: '1.6.0', date: '2026-10-02', assetSize: 20 * 1048576,
-        notes: 'План синхронизирован с активным временем.', relation: 'older' }
-    ];
-    fillReleases('1.8.0');
-    $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.8.0</b> (демо).';
+    RELEASES = demoReleases();
+    fillReleases('1.8.1');
+    demoLockInstall();
+    $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.8.1</b> (демо). ' +
+      'В предпросмотре установка недоступна — запустите приложение CodeTime.';
     return;
   }
   var st = $('updateStatus');
@@ -2488,9 +2507,12 @@ function loadReleases(silent) {
       if (RELEASES[i].relation === 'newer') { newest = RELEASES[i]; break; }
     }
     fillReleases(newest ? newest.version : null);
+    if (DEMO) demoLockInstall();   // добрались сюда через демо-данные (file:// предпросмотр)
     if (newest) {
       st.innerHTML = 'Доступна новая версия <b>v' + esc(newest.version) + '</b> (у вас v' +
-        esc(d.current) + '). Она уже выбрана в списке — нажмите «Установить».';
+        esc(d.current) + ').' + (DEMO
+          ? ' В предпросмотре установка недоступна.'
+          : ' Она уже выбрана в списке — нажмите «Установить».');
     } else {
       st.textContent = 'У вас последняя версия ✓ (v' + esc(d.current) +
         '). Все выпущенные версии — в списке, можно откатиться назад.';
@@ -2504,14 +2526,22 @@ $('updSelect').addEventListener('change', renderRelNotes);
 $('checkUpdateBtn').addEventListener('click', function () { loadReleases(); });
 
 $('installBtn').addEventListener('click', function () {
+  if (DEMO) {
+    showToast('Демо-режим: установка версий — только в приложении CodeTime');
+    return;
+  }
   var r = RELEASES[$('updSelect').value];
-  if (!r || !r.assetUrl) { showToast('У выбранной версии нет файла CodeTime.exe'); return; }
-  if (DEMO) { showToast('Демо-режим: обновление недоступно'); return; }
+  if (!r) return;
+  if (!r.assetUrl) {
+    showToast('У версии v' + (r.version || '?') + ' на GitHub нет файла CodeTime.exe');
+    return;
+  }
   var st = $('updateStatus');
   $('installBtn').disabled = true;
   st.innerHTML = '<span class="spinner"></span>Скачиваю v' + esc(r.version) +
     ' — обычно пара минут, не закрывайте приложение…';
-  apiPost('/api/update/apply', { assetUrl: r.assetUrl, assetName: r.assetName })
+  apiPost('/api/update/apply', { assetUrl: r.assetUrl, assetName: r.assetName,
+                                 assetSize: r.assetSize || 0 })
     .then(function () {
       var tries = 0;
       var poll = setInterval(function () {
@@ -2523,7 +2553,9 @@ $('installBtn').addEventListener('click', function () {
             clearInterval(poll);
             $('installBtn').disabled = false;
             st.textContent = 'Ошибка: ' + (s.message || 'неизвестно') +
-              ' (подробности в update.log в папке данных)';
+              ' (подробности в update.log в папке данных). Если приложение ' +
+              'перестало запускаться — рядом с CodeTime.exe лежит резервная ' +
+              'копия CodeTime.exe.old: переименуйте её в CodeTime.exe.';
           } else if (s.message) {
             st.textContent = s.message;
           }
