@@ -51,6 +51,26 @@ jobs:
             exit 1
           fi
 
+      # Предохранитель: в v1.8.2 случайно уехал dashboard.html из 99 байт
+      # (весь интерфейс превратился в одну строку JS). Больше не повторяем.
+      - name: Verify dashboard.html integrity
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, sys
+          p = 'dashboard.html'
+          if not os.path.exists(p):
+              sys.exit('::error::dashboard.html отсутствует — сборка прервана')
+          size = os.path.getsize(p)
+          if size < 50000:
+              sys.exit('::error::dashboard.html подозрительно мал (%d байт) — файл повреждён, сборка прервана' % size)
+          html = open(p, encoding='utf-8').read()
+          for probe in ('<!DOCTYPE html>', '</html>', '<script>', 'id="updateStatus"', 'id="installBtn"'):
+              if probe not in html:
+                  sys.exit('::error::в dashboard.html нет обязательного фрагмента %r — файл повреждён' % probe)
+          print('dashboard.html OK: %d байт, все фрагменты на месте' % size)
+          PY
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
