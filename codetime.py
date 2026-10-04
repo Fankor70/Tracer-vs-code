@@ -62,7 +62,7 @@ import mentor   # Наставник: ИИ-помощник по фронтен�
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '2.0.0'
+APP_VERSION = '2.0.1'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
