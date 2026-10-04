@@ -573,6 +573,79 @@
   }
   .m-pre::-webkit-scrollbar, .m-area::-webkit-scrollbar { width: 8px; }
   .m-pre::-webkit-scrollbar-thumb, .m-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  /* ---------- Наставник v1.9.2: подсветка кода ---------- */
+  .hl-c { color: #7d8590; font-style: italic; }      /* комментарии */
+  .hl-s { color: #e3b341; }                          /* строки */
+  .hl-k { color: #f97583; }                          /* ключевые слова */
+  .hl-n { color: #d2a8ff; }                          /* числа */
+  .hl-f { color: #56d364; }                          /* функции */
+  .hl-t { color: #56d364; }                          /* теги/селекторы */
+  .hl-a { color: #7ee787; }                          /* атрибуты/свойства */
+  .m-msg.bot pre.m-code { position: relative; padding: 32px 12px 12px; margin: 10px 0 8px; }
+  .m-code-head {
+    position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
+    justify-content: space-between; padding: 4px 12px; background: rgba(255,255,255,.045);
+    border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted);
+    font-family: inherit; white-space: normal;
+  }
+  .m-code-head i { font-style: normal; text-transform: lowercase; }
+  .m-code-copy {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 5px; font-size: 11px; padding: 1px 8px; cursor: pointer; font-family: inherit;
+  }
+  .m-code-copy:hover { color: var(--text); border-color: rgba(16,185,129,.5); }
+  .m-msg.bot h4.md-h { color: var(--green); margin: 10px 0 4px; }
+  .md-q { display: inline-block; border-left: 3px solid rgba(16,185,129,.5); padding-left: 8px; color: var(--muted); }
+  .md-hr { display: block; height: 1px; background: var(--border); margin: 8px 0; }
+  /* ---------- сворачивание длинных ответов ---------- */
+  .m-wrap { display: flex; flex-direction: column; align-self: flex-start; max-width: 86%; }
+  .m-wrap .m-msg { max-width: 100%; }
+  .m-msg.bot { position: relative; }
+  .m-msg.bot.m-collapsed { max-height: 340px; overflow: hidden; }
+  .m-msg.bot.err { border-color: rgba(245,158,11,.5); background: rgba(245,158,11,.07); }
+  .m-expand {
+    align-self: flex-start; background: none; border: 1px dashed var(--border);
+    color: var(--muted); border-radius: 8px; padding: 3px 12px; font-size: 12px;
+    cursor: pointer; margin-top: 5px; font-family: inherit;
+  }
+  .m-expand:hover { color: var(--green); border-color: rgba(16,185,129,.5); }
+  .m-meta { font-size: 11px; color: var(--muted); margin-top: 7px; opacity: .85; }
+  /* ---------- большие вставки пользователя ---------- */
+  .m-paste {
+    align-self: flex-end; max-width: 86%; background: var(--green-dim);
+    border: 1px solid rgba(16,185,129,.3); border-radius: 12px; padding: 10px 12px;
+  }
+  .m-paste-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .m-paste-ic { font-size: 20px; }
+  .m-paste-tit b { display: block; font-size: 13.5px; }
+  .m-paste-tit span { font-size: 11.5px; color: var(--muted); display: block; }
+  .m-paste-btns { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .m-paste-btn {
+    background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; font-size: 12px; padding: 4px 10px; cursor: pointer; font-family: inherit;
+  }
+  .m-paste-btn:hover { border-color: rgba(16,185,129,.5); color: var(--green); }
+  .m-paste-body {
+    max-height: 300px; overflow-y: auto; margin: 10px 0 0; padding: 10px;
+    background: rgba(0,0,0,.28); border-radius: 8px; font-size: 12.5px;
+    white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace;
+  }
+  .m-paste-body[hidden] { display: none; }
+  .m-paste .m-att { margin: 10px 0 0; }
+  /* ---------- План с чекбоксами ---------- */
+  .m-planview {
+    max-height: 540px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; background: var(--panel2); font-size: 14px; line-height: 1.6;
+  }
+  .m-planview::-webkit-scrollbar { width: 8px; }
+  .m-planview::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .m-plan-check { display: flex; align-items: flex-start; gap: 10px; padding: 6px 2px; cursor: pointer; border-radius: 6px; }
+  .m-plan-check:hover { background: rgba(16,185,129,.06); }
+  .m-plan-check input { width: 17px; height: 17px; accent-color: #10b981; margin-top: 3px; cursor: pointer; flex: none; }
+  .m-plan-check.done .m-plan-txt { color: var(--muted); text-decoration: line-through; }
+  .m-plan-h { font-size: 15px; font-weight: 700; margin: 10px 0 4px; }
+  .m-plan-h:first-child { margin-top: 0; }
+  .m-plan-p { margin: 2px 0; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 18px 0 26px; }
 </style>
 </head>
@@ -781,9 +854,13 @@
     <div class="m-pane" id="m-pane-plan">
       <div class="card">
         <h3 class="h3-flex"><span>Дорожная карта · plan.md</span>
-          <span class="right"><button class="btn" id="mentorPlanSave" style="padding:8px 18px">Сохранить</button></span></h3>
-        <textarea id="mentorPlanText" class="m-area" rows="18" spellcheck="false"></textarea>
-        <div class="hintline">Наставник читает этот файл в начале каждого разговора — здесь его представление о ваших целях. Правьте вручную или попросите наставника обновить план.</div>
+          <span class="right" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost" id="mentorPlanEdit" style="padding:8px 14px">✏️ Редактировать</button>
+            <button class="btn" id="mentorPlanSave" style="padding:8px 18px">Сохранить</button>
+          </span></h3>
+        <div id="mentorPlanView" class="m-planview"></div>
+        <textarea id="mentorPlanText" class="m-area" rows="18" spellcheck="false" hidden></textarea>
+        <div class="hintline">Отмечайте пройденные этапы галочками — сохраняется автоматически, наставник видит отметки. Попросите его «обнови план» — он перешлёт план блоком ```план```, и галочки появятся сами. Кнопка «Редактировать» — правка текста вручную.</div>
       </div>
     </div>
 
@@ -795,6 +872,15 @@
             <button class="btn btn-ghost" id="mentorOpenFolder" style="padding:8px 14px">📁 Открыть папку</button>
           </span></h3>
         <pre id="mentorJournalText" class="m-pre"></pre>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;color:var(--muted);font-size:13px">🧠 Заметки «запомни» · notes/notes.md</summary>
+          <pre id="mentorNotesText" class="m-pre" style="margin-top:8px"></pre>
+        </details>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;color:var(--muted);font-size:13px">🖼 Последний разбор макета · layouts/last_review.md</summary>
+          <pre id="mentorLayoutText" class="m-pre" style="margin-top:8px"></pre>
+          <div class="hintline">Этот разбор наставник автоматически держит перед глазами, когда вы просите «разбор кода» — макет и код сверяются вместе.</div>
+        </details>
         <div class="hintline">Чат потерялся или начался новый день? Скопируйте этот файл и вставьте его первым сообщением в новый чат — наставник продолжит ровно с того места, где остановились. Файл лежит в папке памяти и обычный, можно закинуть в свой git.</div>
       </div>
     </div>
@@ -1118,17 +1204,20 @@ function demoPost(path, body) {
       '**3) Адаптив** — ширины в `px`: замени на `rem`/`%`. Сетка товара: `grid-template-columns: 1fr 1.2fr` на десктопе, одна колонка с `600px`.\n\n' +
       '```css\n.product { display: grid; gap: 2rem; }\n@media (min-width: 600px) {\n  .product { grid-template-columns: 1fr 1.2fr; }\n}\n```\n\n' +
       'Оценка за сегодня: **5/10**. Вопрос: что должно происходить с миниатюрами на мобильном — горизонтальная лента или сетка 3×N?';
-    return Promise.resolve({ reply: reply, journalSaved: false });
+    return Promise.resolve({ reply: reply, journalSaved: false, planSaved: false,
+      noteSaved: !!(body.message && /запомни/i.test(body.message)),
+      model: 'gemini-2.5-flash', mode: 'gemini' });
   }
   if (path === '/api/mentor/config') {
     return Promise.resolve({ folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: !!(body.apiKey && body.apiBase),
-      mode: body.apiKey ? 'key' : (body.ghToken ? 'github' : 'demo'),
-      demoModel: 'openai-fast', ghModelsModel: 'openai/gpt-4.1-mini',
+      mode: body.apiKey ? 'key' : (body.ghToken ? 'github' : 'gemini'),
+      demoModel: 'openai-fast', geminiModel: 'gemini-2.5-flash', geminiBlocked: false, geminiReason: '',
+      ghModelsModel: 'openai/gpt-4.1-mini',
       apiBase: body.apiBase || '', model: body.model || '', visionModel: body.visionModel || '',
       hasKey: !!(body.apiKey || ''), hasGhToken: !!(body.ghToken || ''), repo: body.repo || '',
       rolePresent: true, journalPresent: true, ghSnapshot: false });
   }
-  if (path === '/api/mentor/test-llm') return Promise.resolve({ ok: true, via: 'chat', mode: 'demo', model: 'openai-fast', models: [] });
+  if (path === '/api/mentor/test-llm') return Promise.resolve({ ok: true, via: 'chat', mode: 'gemini', model: 'gemini-2.5-flash', models: [] });
   if (path === '/api/mentor/test-github') return Promise.resolve({ ok: true, fullName: 'Fankor70/product-page', private: true, defaultBranch: 'main' });
   if (path === '/api/mentor/github-collect') return Promise.resolve({ ok: true, repo: 'Fankor70/product-page', branch: 'main', files: 12, commits: 8, ts: new Date().toISOString(), summary: 'Репозиторий Fankor70/product-page: 12 файлов, 8 последних коммитов. Теперь наставник видит структуру — попросите «проверь мой код, файлы: путь/к/файлу».' });
   if (path === '/api/mentor/memory-save') return Promise.resolve({ ok: true, saved: Object.keys(body) });
@@ -1373,8 +1462,10 @@ function demoData(path) {
   }
   if (p === '/api/roadmap') return demoRoadmap();
   if (p === '/api/mentor/status') {
-    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: false, mode: 'demo',
-             demoModel: 'openai-fast', ghModelsModel: 'openai/gpt-4.1-mini',
+    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: false, mode: 'gemini',
+             demoModel: 'openai-fast', geminiModel: 'gemini-2.5-flash',
+             geminiBlocked: false, geminiReason: '',
+             ghModelsModel: 'openai/gpt-4.1-mini',
              apiBase: '', model: '', visionModel: '',
              hasKey: false, hasGhToken: false, repo: '',
              rolePresent: true, journalPresent: true, ghSnapshot: false };
@@ -1383,6 +1474,8 @@ function demoData(path) {
     return { folder: 'C:\\Users\\Вы\\CodeTimeMentor',
       role: 'Ты — «Наставник», личный наставник по фронтенду и строгий ревьюер кода студента…',
       journal: '# Журнал прогресса\n\n(в демо пусто — в приложении здесь будут итоги каждой сессии)',
+      notes: '# Заметки «запомни»\n\n(в демо пусто — напиши в чате «запомни: …»)',
+      layoutReview: '',
       plan: '# Дорожная карта — Junior → Middle к апрелю 2027\n\n- [ ] Сентябрь: HTML/CSS + основы JS\n- [ ] Октябрь: JS-приложение на публичном API\n- [ ] Ноябрь: React\n- [ ] Декабрь: CRUD-мини-CRM + авторизация' };
   }
   if (p === '/api/mentor/history') return { date: isoDate(new Date()), messages: [] };
@@ -1391,16 +1484,16 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: 'ivanov/CodeTime',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '1.9.0' };
+             version: '1.9.1' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '1.9.0', latest: '1.9.1',
-             tagName: 'v1.9.1', available: true,
-             assetName: 'CodeTime.exe', assetSize: 22010000,
-             releaseUrl: '#', notes: 'ИИ работает сразу, без ключей: демо-режим на бесплатной модели + GitHub Models по одному токену (с разбором фото)' };
+    return { configured: true, current: '1.9.1', latest: '1.9.2',
+             tagName: 'v1.9.2', available: true,
+             assetName: 'CodeTime.exe', assetSize: 22048000,
+             releaseUrl: '#', notes: 'Наставник: встроенный Gemini с фото, разбор макета связан с разбором кода, подсветка кода, карточки больших вставок, План с чекбоксами, «запомни» в заметки' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '1.9.0', releases: demoReleases() };
+    return { configured: true, current: '1.9.1', releases: demoReleases() };
   }
   return undefined;
 }
@@ -2736,17 +2829,17 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
+    { tag: 'v1.9.2', version: '1.9.2', date: '2026-10-05', assetSize: 22048000,
+      notes: 'Наставник: встроенный Gemini (бесплатно, с фото) с авто-резервом; разбор макета связан с разбором кода; подсветка кода и копирование; большие вставки — карточками со скачиванием .txt; длинные ответы сворачиваются; под каждым ответом видно, какая модель отвечала; План с кликабельными чекбоксами; «запомни …» сохраняется в notes/notes.md.',
+      relation: 'newer' },
     { tag: 'v1.9.1', version: '1.9.1', date: '2026-10-04', assetSize: 22010000,
       notes: 'ИИ работает сразу, без ключей: демо-режим на бесплатной модели + GitHub Models по одному токену (с разбором фото). Мастер настройки упрощён.',
-      relation: 'newer' },
+      relation: 'current' },
     { tag: 'v1.9.0', version: '1.9.0', date: '2026-10-04', assetSize: 22001234,
       notes: 'Наставник — ИИ-помощник по фронтенду: чат с любым OpenAI-совместимым API, разбор макетов по фото, память в папке на ПК (journal.md), чтение GitHub-репозитория, вкладка План.',
-      relation: 'current' },
+      relation: 'older' },
     { tag: 'v1.8.2', version: '1.8.2', date: '2026-10-04', assetSize: 21764741,
       notes: 'Самотест новой версии перед установкой — обновление больше не может сломать приложение.',
-      relation: 'older' },
-    { tag: 'v1.8.1', version: '1.8.1', date: '2026-10-04', assetSize: 21794537,
-      notes: 'Надёжное обновление: докачка до точного размера, бэкап и автооткат, если новая версия не стартовала.',
       relation: 'older' }
   ];
 }
@@ -2761,7 +2854,7 @@ function demoLockInstall() {
 function loadReleases(silent) {
   if (DEMO) {
     RELEASES = demoReleases();
-    fillReleases('1.9.0');
+    fillReleases('1.9.1');
     demoLockInstall();
     $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.9.1</b> (демо). ' +
       'В предпросмотре установка недоступна — запустите приложение CodeTime.';
@@ -2857,15 +2950,17 @@ $('installBtn').addEventListener('click', function () {
 // список версий — один раз при открытии приложения (не спамим GitHub в 30-сек цикле)
 loadReleases(true);
 
-// ---------- Наставник (ИИ-помощник, v1.9.0) ----------
+// ---------- Наставник (ИИ-помощник, v1.9.2) ----------
 
 var M = {
   ready: false,          // инициализация выполнена один раз
   sub: 'chat',           // активная под-вкладка
   status: null,          // ответ /api/mentor/status
-  msgs: [],              // [{role, text, img}]
+  msgs: [],              // [{role, text, img, model, time, error}]
   attach: null,          // {dataUrl, mime, b64, name}
-  journalNote: null,     // плашка «журнал записан»
+  journalNote: null,     // плашка «журнал/план/заметка записаны»
+  expanded: {},          // развёрнутые длинные ответы (idx -> true)
+  planEditing: false,    // План открыт в режиме правки текста
   sending: false
 };
 
@@ -2912,8 +3007,13 @@ function mentorModeLabel(s) {
     return 'GitHub Models: ' + (s.model || s.ghModelsModel || 'openai/gpt-4.1-mini') +
       ' (бесплатно, с фото)' + (s.repo ? ' · GitHub: ' + s.repo : '');
   }
-  return 'Демо-ИИ: ' + (s.demoModel || 'openai-fast') +
-    ' — бесплатно и без ключей (фото макетов — после GitHub-токена)';
+  if (s.mode === 'gemini') {
+    return 'Встроенный Gemini: ' + (s.geminiModel || 'gemini-2.5-flash') +
+      ' — бесплатно, понимает фото макетов';
+  }
+  return 'Резервный ИИ: ' + (s.demoModel || 'openai-fast') +
+    ' — без ключей, фото временно не разобрать' +
+    (s.geminiBlocked && s.geminiReason ? ' (' + s.geminiReason + ')' : '');
 }
 
 function mentorLoadStatus() {
@@ -2938,13 +3038,19 @@ function mentorRenderWizard() {
   } catch (e) { /* приватный режим — просто показываем */ }
   var steps = [];
   if (s.mode !== 'key') {
-    steps.push('<div class="m-step"><b>ИИ уже работает — бесплатно и без всяких ключей</b>' +
-      '<p style="margin:6px 0">Это демо-модель <code>' + esc(s.demoModel || 'openai-fast') +
-      '</code>: код и текст разбирает, лимит общий с другими пользователями. ' +
-      'Для разбора фото макетов подключите бесплатный ИИ по GitHub-токену (шаг ниже) — ' +
-      'тот же токен даст и чтение вашего репозитория.</p>' +
+    var isGem = s.mode === 'gemini';
+    var demoTitle = isGem ? 'ИИ уже работает — встроенный Gemini, без настройки' :
+      'ИИ работает в резервном режиме — без всяких ключей';
+    var demoText = isGem
+      ? 'Модель <code>' + esc(s.geminiModel || 'gemini-2.5-flash') + '</code> по встроенному демо-ключу: бесплатно и понимает фото макетов. Если Google ограничит доступ из вашего региона — автоматически включится резервная модель.'
+      : 'Резервная модель <code>' + esc(s.demoModel || 'openai-fast') + '</code>: текст и код разбирает, фото — нет.' +
+        (s.geminiReason ? ' Встроенный Gemini недоступен: ' + esc(s.geminiReason) + '.' : '') +
+        ' Через час она попробует Gemini снова, либо подключите GitHub-токен ниже.';
+    steps.push('<div class="m-step"><b>' + demoTitle + '</b>' +
+      '<p style="margin:6px 0">' + demoText +
+      ' Для чтения вашего репозитория и личных лимитов подключите GitHub-токен (шаг ниже) или свой ключ в Настройках.</p>' +
       '<div class="m-wz-actions">' +
-      '<button class="btn wz-demo" style="padding:8px 16px">Писать в демо-режиме</button>' +
+      '<button class="btn wz-demo" style="padding:8px 16px">Писать в чат</button>' +
       '<button class="btn btn-ghost wz-go-settings" style="padding:8px 16px">Настроить GitHub-ИИ</button>' +
       '</div></div>');
   }
@@ -2981,38 +3087,269 @@ $('mentorWizard').addEventListener('click', function (e) {
 function mentorRestoreChat() {
   api('/api/mentor/history').then(function (h) {
     M.msgs = (h.messages || []).map(function (m) {
-      return { role: m.role === 'assistant' ? 'assistant' : 'user', text: m.content || '' };
+      return { role: m.role === 'assistant' ? 'assistant' : 'user',
+               text: m.content || '', model: m.model || null,
+               time: m.ts ? String(m.ts).slice(11, 16) : null };
     });
     mentorRenderMsgs();
   }).catch(function () { /* демо-режим подхватит сам */ });
 }
 
-// мини-разметка: код, жирный, заголовки, списки (без внешних библиотек)
-function mdLite(s) {
-  s = esc(s);
-  s = s.replace(/```[^\n]*\n([\s\S]*?)```/g, function (_, code) {
-    return '<pre><code>' + code.replace(/\n$/, '') + '</code></pre>';
-  });
-  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+// ---------- подсветка синтаксиса (мини, без библиотек) ----------
+var HL_KW_JS = 'const|let|var|function|return|if|else|for|while|do|switch|case|default|break|continue|new|class|extends|super|import|export|from|as|try|catch|finally|throw|async|await|typeof|instanceof|this|delete|yield|static|get|set|void|in|of|null|undefined|true|false';
+var HL_KW_PY = 'def|class|import|from|return|if|elif|else|for|while|with|as|try|except|finally|raise|lambda|None|True|False|and|or|not|in|is|pass|break|continue|global|nonlocal|yield|async|await|print|self';
+var HL_RULES = {
+  js: [
+    ['c', '\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/'],
+    ['s', '`(?:\\\\[\\s\\S]|[^`\\\\])*`|"(?:\\\\.|[^"\\\\\\n])*"|\'(?:\\\\.|[^\'\\\\\\n])*\''],
+    ['k', '\\b(?:' + HL_KW_JS + ')\\b'],
+    ['n', '\\b0x[0-9a-fA-F]+\\b|\\b\\d[\\d_]*(?:\\.\\d+)?(?:e[+-]?\\d+)?\\b'],
+    ['f', '[A-Za-z_$][\\w$]*(?=\\s*\\()']
+  ],
+  css: [
+    ['c', '\\/\\*[\\s\\S]*?\\*\\/'],
+    ['k', '@[\\w-]+'],
+    ['s', '"(?:\\\\.|[^"\\\\\\n])*"|\'(?:\\\\.|[^\'\\\\\\n])*\''],
+    ['a', '[-a-zA-Z]+(?=\\s*:)'],
+    ['n', '#[0-9a-fA-F]{3,8}\\b|-?\\.?\\d[\\d.]*(?:px|rem|em|%|vw|vh|vmin|vmax|fr|s|ms|deg|ch|pt)?\\b'],
+    ['t', '\\.[A-Za-z_][\\w-]*|#[A-Za-z_][\\w-]*|::?[a-zA-Z][\\w-]*|&']
+  ],
+  html: [
+    ['c', '<!--[\\s\\S]*?-->'],
+    ['k', '<!DOCTYPE[^>]*>|<!doctype[^>]*>'],
+    ['t', '<\\/?[a-zA-Z][\\w-]*|\\/?>'],
+    ['a', '[a-zA-Z-]+(?=\\s*=)'],
+    ['s', '"[^"\\n]*"|\'[^\'\\n]*\'']
+  ],
+  py: [
+    ['c', '#[^\\n]*'],
+    ['s', '(?:\'\'\'[\\s\\S]*?\'\'\'|"""[\\s\\S]*?"""|"(?:\\\\.|[^"\\\\\\n])*"|\'(?:\\\\.|[^\'\\\\\\n])*\')'],
+    ['k', '\\b(?:' + HL_KW_PY + ')\\b'],
+    ['n', '\\b\\d[\\d_]*(?:\\.\\d+)?\\b'],
+    ['f', '[A-Za-z_][\\w]*(?=\\s*\\()']
+  ],
+  json: [
+    ['a', '"(?:\\\\.|[^"\\\\])*"(?=\\s*:)'],
+    ['s', '"(?:\\\\.|[^"\\\\])*"'],
+    ['n', '-?\\b\\d+(?:\\.\\d+)?(?:e[+-]?\\d+)?\\b'],
+    ['k', '\\b(?:true|false|null)\\b']
+  ]
+};
+HL_RULES.xml = HL_RULES.html;      HL_RULES.svg = HL_RULES.html;
+HL_RULES.javascript = HL_RULES.js; HL_RULES.ts = HL_RULES.js;
+HL_RULES.jsx = HL_RULES.js;        HL_RULES.tsx = HL_RULES.js;
+HL_RULES.python = HL_RULES.py;     HL_RULES.scss = HL_RULES.css;
+HL_RULES.less = HL_RULES.css;      HL_RULES.generic = HL_RULES.js;
+
+function hlEscape(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function hlCode(src, lang) {
+  lang = (lang || '').toLowerCase().trim();
+  var rules = HL_RULES[lang] || HL_RULES.generic;
+  var parts = [], k;
+  for (k = 0; k < rules.length; k++) parts.push('(' + rules[k][1] + ')');
+  var re = new RegExp(parts.join('|'), 'g');
+  var out = '', last = 0, m, g, gi;
+  while ((m = re.exec(src))) {
+    if (m.index > last) out += hlEscape(src.slice(last, m.index));
+    gi = -1;
+    for (g = 1; g <= rules.length; g++) {
+      if (m[g] !== undefined) { gi = g; break; }
+    }
+    out += '<span class="hl-' + (gi > 0 ? rules[gi - 1][0] : 's') + '">' +
+      hlEscape(gi > 0 ? m[gi] : m[0]) + '</span>';
+    last = m.index + m[0].length;
+    if (!m[0].length) re.lastIndex++;   // защита от зацикливания
+  }
+  return out + hlEscape(src.slice(last));
+}
+
+// ---------- мини-разметка v2: код с подсветкой, списки, цитаты, ссылки ----------
+function mdInline(s) {
+  s = s.replace(/`([^`]+)`/g, function (_, c) { return '<code>' + c + '</code>'; });
+  s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<b><i>$1</i></b>');
   s = s.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
-  s = s.replace(/^#{2,4} (.*)$/gm, '<h4>$1</h4>');
-  s = s.replace(/^\d+\. (.*)$/gm, '• $1');
-  s = s.replace(/^- (.*)$/gm, '• $1');
+  s = s.replace(/(^|[\s(>])\*([^*\n]+)\*(?=[\\s).,!?;:<]|$)/g, '$1<i>$2</i>');
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)\\s]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   return s;
+}
+
+function mdLite(src) {
+  var blocks = [];
+  src = String(src || '').replace(/```([A-Za-z0-9_+-]*)[ \t]*\r?\n?([\s\S]*?)```/g,
+    function (_, lang, code) {
+      blocks.push({ lang: lang, code: code.replace(/\n$/, '') });
+      return '\u0001B' + (blocks.length - 1) + '\u0001';
+    });
+  // незакрытый блок в конце (модель не дорисовала ```) — показываем как код
+  src = src.replace(/```([A-Za-z0-9_+-]*)[ \t]*\r?\n([\s\S]+)$/, function (_, lang, code) {
+    blocks.push({ lang: lang, code: code.replace(/\n$/, '') });
+    return '\u0001B' + (blocks.length - 1) + '\u0001';
+  });
+  var s = esc(src);
+  var lines = s.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var L = lines[i];
+    if (/^\s*#{1,6}\s+/.test(L)) {
+      L = '<h4 class="md-h">' + mdInline(L.replace(/^\s*#{1,6}\s+/, '')) + '</h4>';
+    } else if (/^\s*[-*•]\s+\[[ xX]\]\s+/.test(L)) {
+      var done = /\[[xX]\]/.test(L);
+      L = '<span class="md-task">' + (done ? '☑' : '☐') + ' ' +
+        mdInline(L.replace(/^\s*[-*•]\s+\[[ xX]\]\s+/, '')) + '</span>';
+    } else if (/^\s*[-*]\s+/.test(L)) {
+      L = mdInline(L.replace(/^(\s*)[-*]\s+/, '$1• '));
+    } else if (/^\s*\d+[.)]\s+/.test(L)) {
+      L = mdInline(L.replace(/^(\s*)(\d+)[.)]\s+/, '$1$2. '));
+    } else if (/^\s*>\s?/.test(L)) {
+      L = '<span class="md-q">' + mdInline(L.replace(/^\s*>\s?/, '')) + '</span>';
+    } else if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(L)) {
+      L = '<span class="md-hr"></span>';
+    } else {
+      L = mdInline(L);
+    }
+    lines[i] = L;
+  }
+  s = lines.join('\n');
+  return s.replace(/\n?\u0001B(\d+)\u0001\n?/g, function (_, idx) {
+    var b = blocks[+idx] || { lang: '', code: '' };
+    return '<pre class="m-code"><span class="m-code-head"><i>' +
+      esc(b.lang || 'код') + '</i>' +
+      '<button type="button" class="m-code-copy">копировать</button></span>' +
+      '<code>' + hlCode(b.code, b.lang) + '</code></pre>';
+  });
+}
+
+// ---------- длинные сообщения: вставки-карточки и сворачивание ----------
+var M_COLLAPSE_PX = 340;   // выше этой высоты ответ бота сворачивается
+
+function msgWords(t) { return (String(t || '').trim().match(/\S+/g) || []).length; }
+
+function fmtBytes(n) {
+  if (n < 1024) return n + ' Б';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' КБ';
+  return (n / 1048576).toFixed(2) + ' МБ';
+}
+
+function byteLen(s) {
+  try { return new Blob([s]).size; } catch (e) { return String(s || '').length; }
+}
+
+function isBigText(t) {
+  return msgWords(t) > 100 || String(t || '').length > 700;
+}
+
+function mentorMsgHtml(m, i) {
+  if (m.role === 'user') {
+    var att = m.img ? '<img class="m-att" src="' + m.img + '" alt="прикреплённый макет">' : '';
+    if (!isBigText(m.text)) return '<div class="m-msg user">' + att + mdLite(m.text) + '</div>';
+    // большая вставка → компактная карточка «Вставленный текст» (как в референсе)
+    var nLines = String(m.text).split('\n').length;
+    return '<div class="m-paste" data-idx="' + i + '">' +
+      '<div class="m-paste-head"><span class="m-paste-ic">📄</span>' +
+      '<span class="m-paste-tit"><b>Вставленный текст</b><span>' +
+      fmtBytes(byteLen(m.text)) + ' · ' + nLines + ' ' +
+      plural(nLines, 'строка', 'строки', 'строк') + '</span></span>' +
+      '<span class="m-paste-btns">' +
+      '<button type="button" class="m-paste-btn" data-act="toggle">Показать</button>' +
+      '<button type="button" class="m-paste-btn" data-act="txt">Скачать .txt</button>' +
+      '</span></div>' +
+      '<pre class="m-paste-body" hidden>' + esc(m.text) + '</pre>' + att + '</div>';
+  }
+  var meta = m.model
+    ? '<div class="m-meta">🤖 ' + esc(m.model) + (m.time ? ' · ' + esc(m.time) : '') + '</div>'
+    : '';
+  var body = m.error ? esc(m.text) : mdLite(m.text);
+  return '<div class="m-wrap"><div class="m-msg bot' + (m.error ? ' err' : '') +
+    '" data-idx="' + i + '">' + body + meta + '</div></div>';
 }
 
 function mentorRenderMsgs() {
   var box = $('mentorMsgs');
   if (!M.msgs.length) {
-    box.innerHTML = '<div class="m-msg bot">Привет! Я твой Наставник. Пришли код или фото макета — разберу по-честному. Кнопки ниже: разбор кода, разбор макета, «конец дня», задача на завтра. Настрой меня один раз — и я буду помнить всё между разговорами.</div>';
+    box.innerHTML = '<div class="m-msg bot">Привет! Я твой Наставник. Пришли код или фото макета — разберу по-честному. Кнопки ниже: разбор кода, разбор макета, «конец дня», задача на завтра. Разбор макета запоминается — потом «разбор кода» сверяет вёрстку с этим макетом. Скажи «запомни …» — сохраню в заметки. Настрой меня один раз — и я буду помнить всё между разговорами.</div>';
     return;
   }
-  box.innerHTML = M.msgs.map(function (m) {
-    var att = m.img ? '<img class="m-att" src="' + m.img + '" alt="прикреплённый макет">' : '';
-    return '<div class="m-msg ' + (m.role === 'user' ? 'user' : 'bot') + '">' + att + mdLite(m.text) + '</div>';
-  }).join('') + (M.journalNote ? '<div class="m-note">📝 Записано в journal.md (Журнал)</div>' : '');
+  box.innerHTML = M.msgs.map(mentorMsgHtml).join('') +
+    (M.journalNote || '');
+  // свернуть длинные ответы бота (кроме развёрнутых вручную)
+  var bots = box.querySelectorAll('.m-msg.bot');
+  bots.forEach(function (el) {
+    var idx = el.dataset.idx;
+    if (el.scrollHeight > M_COLLAPSE_PX + 40 && !M.expanded[idx]) {
+      el.classList.add('m-collapsed');
+      var wrap = el.parentElement;
+      if (wrap && !wrap.querySelector('.m-expand')) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'm-expand';
+        btn.textContent = 'Показать полностью';
+        btn.dataset.idx = idx;
+        wrap.appendChild(btn);
+      }
+    }
+  });
   box.scrollTop = box.scrollHeight;
 }
+
+function copyText(txt, okMsg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt)
+      .then(function () { showToast(okMsg || 'Скопировано'); })
+      .catch(function () { showToast('Не скопировалось'); });
+  } else {
+    showToast('Копирование недоступно в этом окне');
+  }
+}
+
+function downloadTxt(name, text) {
+  try {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  } catch (e) { showToast('Не удалось скачать файл'); }
+}
+
+// клики внутри чата: развернуть/свернуть ответ, копировать код, карточки вставок
+$('mentorMsgs').addEventListener('click', function (e) {
+  var exp = e.target.closest('.m-expand');
+  if (exp) {
+    var idx = exp.dataset.idx;
+    M.expanded[idx] = !M.expanded[idx];
+    var bubble = exp.parentElement.querySelector('.m-msg.bot[data-idx="' + idx + '"]');
+    if (bubble) {
+      var collapsed = bubble.classList.toggle('m-collapsed', !M.expanded[idx]);
+      exp.textContent = collapsed ? 'Показать полностью' : 'Свернуть';
+      bubble.scrollIntoView({ block: 'nearest' });
+    }
+    return;
+  }
+  var cp = e.target.closest('.m-code-copy');
+  if (cp) {
+    var pre = cp.closest('pre');
+    var code = pre ? pre.querySelector('code') : null;
+    copyText(code ? code.textContent : '', 'Код скопирован');
+    return;
+  }
+  var pb = e.target.closest('.m-paste-btn');
+  if (pb) {
+    var card = pb.closest('.m-paste');
+    var i2 = parseInt(card.dataset.idx, 10);
+    if (pb.dataset.act === 'toggle') {
+      var body = card.querySelector('.m-paste-body');
+      body.hidden = !body.hidden;
+      pb.textContent = body.hidden ? 'Показать' : 'Скрыть';
+    } else {
+      downloadTxt('codetime-message-' + (i2 + 1) + '.txt', M.msgs[i2] ? M.msgs[i2].text : '');
+    }
+  }
+});
 
 function mentorSend(mode) {
   if (M.sending) return;
@@ -3024,7 +3361,7 @@ function mentorSend(mode) {
   if (DEMO) {
     // предпросмотр файла — заготовленный ответ подставит demoPost
   } else if (s.mode === 'demo' && M.attach) {
-    showToast('Фото в демо-режиме не разобрать — подключите GitHub-токен в Настройках (бесплатно, 2 минуты)');
+    showToast('Фото сейчас не разобрать: встроенный Gemini недоступен из вашего региона, а резервная модель без зрения. Подключите GitHub-токен или свой ключ в Настройках');
     return;
   }
   M.msgs.push({ role: 'user', text: text || hint, img: M.attach ? M.attach.dataUrl : null });
@@ -3042,16 +3379,23 @@ function mentorSend(mode) {
   box.appendChild(think);
   box.scrollTop = box.scrollHeight;
   apiPost('/api/mentor/chat', payload).then(function (r) {
-    M.journalNote = r.journalSaved
-      ? '<div class="m-note">📝 Записано в journal.md (Журнал)</div>' : null;
-    M.msgs.push({ role: 'assistant', text: r.reply || '(пустой ответ)' });
+    var notes = [];
+    if (r.journalSaved) notes.push('📝 Записано в journal.md (Журнал)');
+    if (r.planSaved) notes.push('🗺 План обновлён — галочки в «Плане»');
+    if (r.noteSaved) notes.push('🧠 Запомнил — сохранил в notes/notes.md');
+    M.journalNote = notes.length ? '<div class="m-note">' + notes.join(' · ') + '</div>' : null;
+    var d = new Date();
+    M.msgs.push({ role: 'assistant', text: r.reply || '(пустой ответ)',
+                  model: r.model || null,
+                  time: ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) });
   }).catch(function (e) {
-    M.msgs.push({ role: 'assistant', text: '⚠️ ' + (e.message || 'Неизвестная ошибка') +
-      '\n\nПроверьте Настройки Наставника (ключ, модель) и подключение к интернету, затем попробуйте ещё раз.' });
+    M.msgs.push({ role: 'assistant', error: true,
+                  text: '⚠️ ' + (e.message || 'Неизвестная ошибка') +
+      '\n\nПроверьте Настройки Наставника и подключение к интернету, затем попробуйте ещё раз.' });
   }).then(function () {
     M.sending = false;
     mentorRenderMsgs();
-    M.memory = null;   // журнал мог обновиться — перечитаем при открытии
+    M.memory = null;   // журнал/план могли обновиться — перечитаем при открытии
   });
 }
 
@@ -3094,14 +3438,86 @@ function mentorSetAttach(file) {
 function mentorLoadMemory() {
   api('/api/mentor/memory').then(function (m) {
     M.memory = m;
+    renderPlanView();
     var planEl = $('mentorPlanText');
-    if (document.activeElement !== planEl) planEl.value = m.plan || '';
+    if (!planEl.hidden && document.activeElement !== planEl) planEl.value = m.plan || '';
     $('mentorJournalText').textContent = m.journal || '(пусто)';
+    var nt = $('mentorNotesText');
+    if (nt) nt.textContent = m.notes || '(пока нет заметок — напишите в чате «запомни: …»)';
+    var lt = $('mentorLayoutText');
+    if (lt) lt.textContent = m.layoutReview || '(ещё не было разбора макета — пришлите фото)';
     var roleEl = $('mRole');
     if (document.activeElement !== roleEl) roleEl.value = m.role || '';
     if (m.folder) $('mFolder').textContent = m.folder;
   }).catch(function () { /* демо */ });
 }
+
+// ---------- План: чекбоксы + ручная правка ----------
+
+var PLAN_CHECK_RE = /^(\s*)[-*•]\s+\[([ xX])\]\s+(.*)$/;
+var planSaveTimer = null;
+
+function renderPlanView() {
+  var view = $('mentorPlanView');
+  if (!view) return;
+  var md = (M.memory && M.memory.plan) || '';
+  var lines = md.split('\n');
+  var html = [];
+  for (var i = 0; i < lines.length; i++) {
+    var L = lines[i];
+    var m = L.match(PLAN_CHECK_RE);
+    if (m) {
+      var done = m[2].toLowerCase() === 'x';
+      html.push('<label class="m-plan-check' + (done ? ' done' : '') + '">' +
+        '<input type="checkbox" data-line="' + i + '"' + (done ? ' checked' : '') + '>' +
+        '<span class="m-plan-txt">' + mdInline(esc(L.replace(PLAN_CHECK_RE, '$3'))) + '</span></label>');
+    } else if (/^\s*#{1,6}\s+/.test(L)) {
+      html.push('<div class="m-plan-h">' + mdInline(esc(L.replace(/^\s*#{1,6}\s+/, ''))) + '</div>');
+    } else if (L.trim() !== '') {
+      html.push('<div class="m-plan-p">' + mdInline(esc(L)) + '</div>');
+    }
+  }
+  view.innerHTML = html.join('') || '<div class="empty">plan.md пуст — нажмите «Редактировать»</div>';
+}
+
+$('mentorPlanView').addEventListener('change', function (e) {
+  var cb = e.target.closest('input[type="checkbox"]');
+  if (!cb) return;
+  var line = parseInt(cb.dataset.line, 10);
+  var md = (M.memory && M.memory.plan) || '';
+  var lines = md.split('\n');
+  if (lines[line] === undefined) return;
+  lines[line] = cb.checked
+    ? lines[line].replace(/\[ \]/, '[x]')
+    : lines[line].replace(/\[[xX]\]/, '[ ]');
+  M.memory = M.memory || {};
+  M.memory.plan = lines.join('\n');
+  cb.closest('.m-plan-check').classList.toggle('done', cb.checked);
+  clearTimeout(planSaveTimer);
+  planSaveTimer = setTimeout(function () {
+    apiPost('/api/mentor/memory-save', { plan: M.memory.plan })
+      .then(function () { showToast('План сохранён ✓'); })
+      .catch(function (e2) { showToast('Ошибка сохранения: ' + e2.message); });
+  }, 500);
+});
+
+$('mentorPlanEdit').addEventListener('click', function () {
+  var view = $('mentorPlanView'), ta = $('mentorPlanText');
+  M.planEditing = ta.hidden;   // сейчас скрыт → переключаемся в правку
+  if (M.planEditing) {
+    ta.value = (M.memory && M.memory.plan) || '';
+    ta.hidden = false;
+    view.hidden = true;
+    this.textContent = '👁 К чекбоксам';
+  } else {
+    M.memory = M.memory || {};
+    M.memory.plan = ta.value;
+    ta.hidden = true;
+    view.hidden = false;
+    this.textContent = '✏️ Редактировать';
+    renderPlanView();
+  }
+});
 
 function mentorFillSettings() {
   var s = M.status || {};
@@ -3116,8 +3532,11 @@ function mentorFillSettings() {
       mo.innerHTML = '<span class="m-ok">Сейчас: свой ключ' + (s.model ? ' · ' + esc(s.model) : '') + '</span>';
     } else if (s.mode === 'github') {
       mo.innerHTML = '<span class="m-ok">Сейчас: GitHub Models — бесплатно по GitHub-токену' + (s.model || s.ghModelsModel ? ' · ' + esc(s.model || s.ghModelsModel) : '') + '</span>';
+    } else if (s.mode === 'gemini') {
+      mo.innerHTML = '<span class="m-ok">Сейчас: встроенный Gemini · ' + esc(s.geminiModel || 'gemini-2.5-flash') + ' — бесплатно, с фото, без ключей</span>';
     } else {
-      mo.innerHTML = '<span class="m-ok">Сейчас: демо-ИИ без ключей · ' + esc(s.demoModel || 'openai-fast') + ' (фото — после GitHub-токена)</span>';
+      mo.innerHTML = '<span class="m-ok">Сейчас: резервный ИИ без ключей · ' + esc(s.demoModel || 'openai-fast') + '</span>' +
+        (s.geminiBlocked ? '<div class="muted-lbl">Gemini недоступен' + (s.geminiReason ? ': ' + esc(s.geminiReason) : '') + ' — резерв включается автоматически, через час попробует Gemini снова</div>' : '');
     }
   }
 }
@@ -3159,14 +3578,17 @@ $('mTestLlm').addEventListener('click', function () {
   mentorSaveAll().then(function () {
     return apiPost('/api/mentor/test-llm', {});
   }).then(function (r) {
+    var note = r.fallbackNote ? '<div class="muted-lbl">' + esc(r.fallbackNote) + '</div>' : '';
     if (r.mode === 'demo') {
-      out.innerHTML = '<span class="m-ok">✓ Демо-ИИ отвечает (' + esc(r.model || 'openai-fast') + ') — бесплатно, без ключей. Для фото макетов подключите GitHub-токен.</span>';
+      out.innerHTML = '<span class="m-ok">✓ Резервный ИИ отвечает (' + esc(r.model || 'openai-fast') + ') — бесплатно, без ключей. Фото макетов он не видит.</span>' + note;
+    } else if (r.mode === 'gemini') {
+      out.innerHTML = '<span class="m-ok">✓ Встроенный Gemini отвечает (' + esc(r.model || 'gemini-2.5-flash') + ') — бесплатно, с фото</span>' + note;
     } else if (r.mode === 'github') {
-      out.innerHTML = '<span class="m-ok">✓ GitHub Models отвечает (' + esc(r.model || 'openai/gpt-4.1-mini') + ') — бесплатно по вашему токену</span>';
+      out.innerHTML = '<span class="m-ok">✓ GitHub Models отвечает (' + esc(r.model || 'openai/gpt-4.1-mini') + ') — бесплатно по вашему токену</span>' + note;
     } else {
       out.innerHTML = '<span class="m-ok">✓ Ключ работает' +
         (r.models && r.models.length
-          ? '. Доступные модели: ' + esc(r.models.slice(0, 8).join(', ')) : '') + '</span>';
+          ? '. Доступные модели: ' + esc(r.models.slice(0, 8).join(', ')) : '') + '</span>' + note;
     }
   }).catch(function (e) {
     out.innerHTML = '<span class="m-bad">✗ ' + esc(e.message) + '</span>';
@@ -3205,8 +3627,23 @@ $('mPreset').addEventListener('change', function () {
 });
 
 $('mentorPlanSave').addEventListener('click', function () {
-  apiPost('/api/mentor/memory-save', { plan: $('mentorPlanText').value })
-    .then(function () { showToast('plan.md сохранён'); })
+  // сохраняем то, что сейчас на экране: textarea в правке или чекбоксы
+  var plan = $('mentorPlanText').hidden
+    ? (M.memory && M.memory.plan) || ''
+    : $('mentorPlanText').value;
+  apiPost('/api/mentor/memory-save', { plan: plan })
+    .then(function () {
+      showToast('plan.md сохранён');
+      M.memory = M.memory || {};
+      M.memory.plan = plan;
+      if (!$('mentorPlanText').hidden) {
+        $('mentorPlanText').hidden = true;
+        $('mentorPlanView').hidden = false;
+        $('mentorPlanEdit').textContent = '✏️ Редактировать';
+        M.planEditing = false;
+      }
+      renderPlanView();
+    })
     .catch(function (e) { showToast('Ошибка: ' + e.message); });
 });
 
@@ -3263,6 +3700,7 @@ document.querySelector('#tab-mentor .m-chips').addEventListener('click', functio
 $('mentorClearChat').addEventListener('click', function () {
   M.msgs = [];
   M.journalNote = null;
+  M.expanded = {};
   mentorRenderMsgs();
 });
 

@@ -1,24 +1,30 @@
 # -*- coding: utf-8 -*-
-"""CodeTime Наставник — встроенный ИИ-помощник по фронтенду (v1.9.1).
+"""CodeTime Наставник — встроенный ИИ-помощник по фронтенду (v1.9.2).
 
 Всё состояние хранится в ОБЫЧНОЙ ПАПКЕ на ПК пользователя:
   %USERPROFILE%\\CodeTimeMentor\\
-    config.json   — подключение к ИИ (любой OpenAI-совместимый API) и GitHub
-    role.txt      — роль/характер наставника (можно править блокнотом)
-    journal.md    — Журнал прогресса (память между чатами)
-    plan.md       — дорожная карта обучения
-    history/      — переписка по дням (JSON)
-    layouts/      — присланные фото макетов
+    config.json        — подключение к ИИ (любой OpenAI-совместимый API) и GitHub
+    role.txt           — роль/характер наставника (можно править блокнотом)
+    journal.md         — Журнал прогресса (память между чатами)
+    plan.md            — дорожная карта обучения (чекбоксы - [ ] / - [x])
+    notes/notes.md     — «запомни вот это»: авто-заметки из чата
+    history/           — переписка по дням (JSON)
+    layouts/           — фото макетов + last_review.md (контекст последнего
+                         разбора макета — подставляется в «разбор кода»,
+                         чтобы макет и код сверялись вместе)
+    gemini_state.json  — внутренний кэш доступности встроенного Gemini
 
 Наставник сам создаёт эту папку при первом запуске («сам поднимет всё,
-что ему нужно»). Вставлять ключи НЕ обязательно — работают 3 режима:
-  1. ДЕМО (без всяких ключей) — бесплатная публичная модель Pollinations
-     openai-fast (GPT-OSS 20B); текст и код, лимит ~1 запрос/3 сек;
+что ему нужно»). Вставлять ключи НЕ обязательно — цепочка из 4 режимов:
+  1. СВОЙ КЛЮЧ — любой OpenAI-совместимый API (Z.ai, OpenRouter, VseGPT…);
   2. GITHUB (один бесплатный токен GitHub: Contents: Read + Models: Read) —
      и репозиторий читает, и полноценный ИИ GitHub Models
      openai/gpt-4.1-mini с разбором фото макетов;
-  3. СВОЙ КЛЮЧ — любой OpenAI-совместимый API (Z.ai, OpenRouter, VseGPT…).
-Режим выбирается автоматически: свой ключ > GitHub-токен > демо.
+  3. ВСТРОЕННЫЙ GEMINI (демо-ключ от автора CodeTime) — бесплатно, с фото;
+     если Google блокирует регион — пауза на час и авто-переход к резерву;
+  4. РЕЗЕРВ (без всяких ключей) — бесплатная публичная модель Pollinations
+     openai-fast (GPT-OSS 20B); текст и код, лимит общий.
+Режим выбирается автоматически; при сбое включается следующий (фолбэк).
 
 API (обслуживается локальным сервером CodeTime, порт 5731):
   GET  /api/mentor/status   — состояние настройки (что уже подключено)
@@ -32,6 +38,11 @@ API (обслуживается локальным сервером CodeTime, п
   POST /api/mentor/journal-append — дописать блок в журнал
   POST /api/mentor/github-collect — собрать снимок репозитория
   POST /api/mentor/open-folder    — открыть папку памяти в Проводнике
+
+Связка «макет → код»: ответ на разбор макета сохраняется в
+layouts/last_review.md и автоматически попадает в контекст следующего
+разбора кода — наставник сверяет вёрстку с макетом. Сообщения со словом
+«запомни» дописываются в notes/notes.md и всегда видны наставнику.
 
 Зависимости: только стандартная библиотека (urllib) — PyInstaller берёт
 модуль в exe автоматически через import в codetime.py.
@@ -61,6 +72,10 @@ PLAN_PATH = os.path.join(MENTOR_DIR, 'plan.md')
 GH_CACHE_PATH = os.path.join(MENTOR_DIR, 'github_cache.json')
 HISTORY_DIR = os.path.join(MENTOR_DIR, 'history')
 LAYOUTS_DIR = os.path.join(MENTOR_DIR, 'layouts')
+LAYOUT_REVIEW_PATH = os.path.join(LAYOUTS_DIR, 'last_review.md')
+NOTES_DIR = os.path.join(MENTOR_DIR, 'notes')
+NOTES_PATH = os.path.join(NOTES_DIR, 'notes.md')
+GEMINI_STATE_PATH = os.path.join(MENTOR_DIR, 'gemini_state.json')
 
 DEFAULT_CONFIG = {
     'api_base': '',       # например https://api.z.ai/api/paas/v4
@@ -71,7 +86,16 @@ DEFAULT_CONFIG = {
     'repo': '',           # owner/name репозитория с вёрсткой
 }
 
-# --- Демо-ИИ: бесплатная публичная модель, вообще БЕЗ ключей (v1.9.1) ---
+# --- Встроенный Gemini: демо-ключ от автора CodeTime (v1.9.2) ---------
+# Бесплатный тариф Google AI Studio. Ключ открыт в коде СПЕЦИАЛЬНО:
+# чтобы Наставник работал у всех сразу, без настройки. Лимит общий —
+# при исчерпании (429) или региональной блокировке цепочка уходит в резерв.
+GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai'
+GEMINI_DEMO_KEY = 'AIzaSyBkM43GubPwITES7z1vqI1Wa-hfxiUe4JY'
+GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash-lite']
+GEMINI_DISABLE_MIN = 60   # пауза после региональной блокировки, минут
+
+# --- Резерв: бесплатная публичная модель, вообще БЕЗ ключей ----------
 # Pollinations, anonymous tier. Параметр referrer обязателен: без него
 # API отвечает 402 Payment Required. 'private' — не показывать запрос
 # в публичной ленте сервиса.
@@ -172,12 +196,21 @@ DEFAULT_PLAN = """# Дорожная карта — Junior → Middle к апр�
 Наставник обновляет этот файл по итогам сессий. Можно править вручную.
 """
 
+DEFAULT_NOTES = """# Заметки «запомни»
+
+> Сюда автоматически попадают сообщения из чата со словом «запомни»
+> (например: «запомни вот это: …»). Наставник читает этот файл
+> в начале каждого разговора.
+"""
+
 # Инструкции-обёртки для кнопок чата
 MODE_INSTRUCTIONS = {
     'code': ('ЗАДАЧА: разбор кода студента. Работай по режиму «Разбор кода»: '
              'по порядку — баги, семантика/доступность, адаптив/единицы, '
              'структура CSS, мелочи. По каждой проблеме: где, почему плохо, '
-             'ДО/ПОСЛЕ на его коде.'),
+             'ДО/ПОСЛЕ на его коде. Если ниже есть «ПОСЛЕДНИЙ РАЗБОР МАКЕТА» — '
+             'сначала коротко сверь код с макетом: что совпало, чего из макета '
+             'не хватает, где вёрстка расходится с задумкой.'),
     'layout': ('ЗАДАЧА: разбор макета по прикреплённому фото/скриншоту. '
                'Работай по режиму «Разбор макета»: блоки и иерархия, сетка, '
                'отступы/шрифты/цвета (примерно), отсутствующие состояния, '
@@ -190,6 +223,8 @@ MODE_INSTRUCTIONS = {
     'task': ('ЗАДАЧА: сформулируй задачу на завтра по формату: Цель / Шаги / '
              'Критерий «готово» / Ограничения / Время / Прокачиваемый навык.'),
 }
+
+_REMEMBER_RE = re.compile(r'\bзапомни\b', re.IGNORECASE)
 
 
 # ============================================================
@@ -207,11 +242,13 @@ def ensure_all():
     os.makedirs(MENTOR_DIR, exist_ok=True)
     os.makedirs(HISTORY_DIR, exist_ok=True)
     os.makedirs(LAYOUTS_DIR, exist_ok=True)
+    os.makedirs(NOTES_DIR, exist_ok=True)
     _write_if_missing(CONFIG_PATH,
                       json.dumps(DEFAULT_CONFIG, ensure_ascii=False, indent=2))
     _write_if_missing(ROLE_PATH, DEFAULT_ROLE)
     _write_if_missing(JOURNAL_PATH, DEFAULT_JOURNAL)
     _write_if_missing(PLAN_PATH, DEFAULT_PLAN)
+    _write_if_missing(NOTES_PATH, DEFAULT_NOTES)
 
 
 def _read(path, default=''):
@@ -268,17 +305,24 @@ def save_config(patch):
 
 def api_status():
     cfg = load_config()
+    gem = _gemini_state()
+    gem_blocked = _gemini_blocked(gem)
     if cfg['api_key'] and cfg['api_base']:
         mode = 'key'          # свой ключ, любой OpenAI-совместимый API
     elif cfg['gh_token']:
         mode = 'github'       # GitHub Models по токену (бесплатно, с vision)
+    elif not gem_blocked:
+        mode = 'gemini'       # встроенный Gemini (демо-ключ, с vision)
     else:
-        mode = 'demo'         # демо-ИИ вообще без ключей
+        mode = 'demo'         # резерв без ключей (Gemini временно недоступен)
     return {
         'folder': MENTOR_DIR,
         'configured': bool(cfg['api_key'] and cfg['api_base']),
         'mode': mode,
         'demoModel': DEMO_LLM_MODEL,
+        'geminiModel': gem.get('model') or GEMINI_MODELS[0],
+        'geminiBlocked': gem_blocked,
+        'geminiReason': (gem.get('reason') or '')[:160],
         'ghModelsModel': GH_MODELS_MODEL,
         'apiBase': cfg['api_base'],
         'model': cfg['model'],
@@ -297,6 +341,8 @@ def api_memory():
         'journal': _read(JOURNAL_PATH),
         'plan': _read(PLAN_PATH),
         'role': _read(ROLE_PATH),
+        'notes': _read(NOTES_PATH),
+        'layoutReview': _read(LAYOUT_REVIEW_PATH),
         'folder': MENTOR_DIR,
     }
 
@@ -387,15 +433,15 @@ def _http_json(url, payload=None, headers=None, timeout=180):
     except urllib.error.HTTPError as e:
         body = ''
         try:
-            body = e.read().decode('utf-8', 'replace')[:400]
+            body = e.read().decode('utf-8', 'replace')[:300]
         except Exception:
             pass
         if e.code == 401:
             raise MentorError('Ключ отклонён (401). Проверьте ключ API в Настройках Наставника.')
         if e.code == 404:
-            raise MentorError('Адрес API не найден (404). Проверьте «Адрес API» — обычно он заканчивается на /v1 или /api/paas/v4.')
+            raise MentorError('Адрес или модель не найдены (404): %s' % (body or e.reason))
         if e.code == 429:
-            raise MentorError('Лимит запросов (429): на аккаунте закончился баланс/квота.')
+            raise MentorError('Лимит запросов (429): квота исчерпана, повторите позже.')
         raise MentorError('API вернул ошибку %s: %s' % (e.code, body or e.reason))
     except MentorError:
         raise
@@ -403,86 +449,219 @@ def _http_json(url, payload=None, headers=None, timeout=180):
         raise MentorError('Нет связи с API (%s). Проверьте интернет и адрес.' % e)
 
 
-def _llm_params(cfg, model):
-    """Куда реально стучаться: (base, key, model, mode).
-    Приоритет: свой ключ > GitHub Models по gh-токену > демо-ИИ без ключей."""
+# ============================================================
+# Цепочка ИИ-провайдеров: свой ключ > GitHub > Gemini > резерв
+# ============================================================
+
+def _gemini_state():
+    try:
+        st = json.loads(_read(GEMINI_STATE_PATH, '{}'))
+        if isinstance(st, dict):
+            return st
+    except (ValueError, TypeError):
+        pass
+    return {}
+
+
+def _gemini_save(st):
+    try:
+        ensure_all()
+        _write(GEMINI_STATE_PATH, json.dumps(st, ensure_ascii=False, indent=1))
+    except OSError:
+        pass
+
+
+def _gemini_blocked(st=None):
+    """True, если Gemini недавно упал по региональной блокировке —
+    чтобы не гонять каждый запрос вникула, ждём GEMINI_DISABLE_MIN минут."""
+    st = st if st is not None else _gemini_state()
+    until = st.get('disabled_until') or ''
+    if not until:
+        return False
+    try:
+        return datetime.fromisoformat(until) > datetime.now()
+    except ValueError:
+        return False
+
+
+def _llm_chain(cfg, force_gemini=False):
+    """Список провайдеров по приоритету. Каждый:
+    {mode, base, key, models, url_suffix, extra, timeout}.
+    Свой ключ — единственный провайдер (ошибки сообщаем как есть,
+    без тихих фолбэков: пользователь должен знать, что его ключ сломан)."""
     if cfg['api_key'] and cfg['api_base']:
-        return (cfg['api_base'].rstrip('/'), cfg['api_key'],
-                model or cfg['model'] or '', 'key')
+        return [{'mode': 'key', 'base': cfg['api_base'].rstrip('/'),
+                 'key': cfg['api_key'],
+                 'models': [cfg['model'] or 'gpt-4o-mini'],
+                 'url_suffix': '/chat/completions', 'extra': {}, 'timeout': 150}]
+    chain = []
     if cfg['gh_token']:
-        return (GH_MODELS_BASE, cfg['gh_token'],
-                model or cfg['model'] or GH_MODELS_MODEL, 'github')
-    return (DEMO_LLM_BASE, '', model or DEMO_LLM_MODEL, 'demo')
+        chain.append({'mode': 'github', 'base': GH_MODELS_BASE,
+                      'key': cfg['gh_token'],
+                      'models': [cfg['model'] or GH_MODELS_MODEL],
+                      'url_suffix': '/chat/completions', 'extra': {},
+                      'timeout': 150})
+    if force_gemini or not _gemini_blocked():
+        st = _gemini_state()
+        models = [st['model']] if st.get('model') else []
+        models += GEMINI_MODELS
+        chain.append({'mode': 'gemini', 'base': GEMINI_BASE,
+                      'key': GEMINI_DEMO_KEY,
+                      'models': list(dict.fromkeys(models)),
+                      'url_suffix': '/chat/completions',
+                      'extra': {'temperature': 0.6}, 'timeout': 120})
+    chain.append({'mode': 'demo', 'base': DEMO_LLM_BASE,
+                  'key': '',
+                  # у анонимного тарифа Pollinations осталась одна модель
+                  # (алиас 'openai' дублирует её на случай смены имени)
+                  'models': list(dict.fromkeys(
+                      [DEMO_LLM_MODEL, 'openai'])),
+                  'url_suffix': '',   # Pollinations: base уже включает /openai
+                  'extra': {'referrer': DEMO_LLM_REFERRER}, 'timeout': 150})
+    return chain
+
+
+def _vision_available(cfg):
+    """Фото макета можно отправить, если в цепочке есть хоть одна модель
+    со зрением (свой ключ / GitHub / встроенный Gemini). Резерв Pollinations
+    — текст-only."""
+    if cfg['api_key'] and cfg['api_base']:
+        return True
+    if cfg['gh_token']:
+        return True
+    return not _gemini_blocked()
+
+
+def _classify_error(e):
+    """Тип ошибки для маршрутизации фолбэков.
+    'region' — локация не поддержана; 'model404' — модели нет у провайдера;
+    'throttle' — лимит/перегрузка; 'auth' — ключ; 'net' — сеть/прочее."""
+    s = str(e)
+    if ('location is not supported' in s or 'FAILED_PRECONDITION' in s
+            or 'User location' in s):
+        return 'region'
+    if '404' in s:
+        return 'model404'
+    if ('402' in s or '429' in s or '500' in s or '502' in s or '503' in s
+            or 'перегружен' in s):
+        return 'throttle'
+    if '401' in s or '403' in s:
+        return 'auth'
+    return 'net'
+
+
+def _short_err(e):
+    """Короткая человеческая ошибка без сырых JSON-простыней."""
+    s = str(e).split('{')[0].strip().rstrip(':; ,')
+    return s[:160] if s else 'нет связи'
 
 
 def _parse_content(data):
-    """Достаёт текст из ответа chat/completions (content бывает списком)."""
+    """Достаёт текст из ответа chat/completions.
+    Терпит missing content (только reasoning), список частей,
+    <think>-обёртки reasoning-моделей. Сырой JSON пользователю
+    НЕ показываем — только короткие человеческие слова."""
     try:
-        content = data['choices'][0]['message']['content']
+        msg = data['choices'][0]['message']
     except (KeyError, IndexError, TypeError):
-        raise MentorError('Модель вернула неожиданный ответ: %s'
-                          % json.dumps(data, ensure_ascii=False)[:300])
+        raise MentorError('Модель прислала пустой ответ — пробую другую.')
+    content = msg.get('content')
     if isinstance(content, list):  # некоторые провайдеры шлют список частей
         parts = []
         for p in content:
             if isinstance(p, dict) and p.get('type') == 'text':
                 parts.append(p.get('text', ''))
         content = '\n'.join(parts)
-    content = (content or '').strip()
-    if not content:
-        # reasoning-модели иногда отдают весь бюджет размышлениям —
-        # тогда хотя бы вернём сам ход мысли
-        reasoning = ''
+    text = (content or '').strip()
+    # reasoning-модели (GPT-OSS и т.п.) иногда весь бюджет тратят на мысль:
+    # content пуст, но есть поле reasoning / reasoning_content
+    if not text:
+        text = (msg.get('reasoning') or msg.get('reasoning_content') or '').strip()
+    # некоторые модели заворачивают размышления в <think>…</think>
+    text = re.sub(r'<think>[\s\S]*?</think>\s*', '', text).strip()
+    if not text:
+        fr = ''
         try:
-            reasoning = (data['choices'][0]['message'].get('reasoning')
-                         or '').strip()
-        except (KeyError, IndexError, TypeError, AttributeError):
+            fr = data['choices'][0].get('finish_reason') or ''
+        except (KeyError, IndexError, TypeError):
             pass
-        content = reasoning
-    if not content:
-        raise MentorError('Модель вернула пустой ответ.')
-    return content
+        hint = ' (модель обрезала ответ: %s)' % fr if fr == 'length' else ''
+        raise MentorError('Модель вернула пустой ответ%s — пробую другую.' % hint)
+    return text
 
 
-def llm_chat(messages, model, timeout=240):
+def llm_chat(messages, model=None, timeout=None):
+    """Задаёт вопрос по цепочке провайдеров. Возвращает (текст, режим, модель).
+    Никогда не падает с сырым JSON: только короткие русские сообщения.
+    """
     cfg = load_config()
-    base, key, model, mode = _llm_params(cfg, model)
-    headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'CodeTime-Mentor/' + _ver(),
-    }
-    if mode == 'demo':
-        # бесплатно и без ключей; referrer обязателен (иначе 402).
-        # ВАЖНО: у анонимного тарифа жёсткий троттлинг по IP — при частых
-        # запросах API отвечает 402, поэтому ждём и повторяем.
-        payload = {'model': model, 'messages': messages,
-                   'max_tokens': 4000, 'stream': False,
-                   'referrer': DEMO_LLM_REFERRER}
-        last_err = None
-        # фолбэк-алиасы модели + паузы против троттлинга (402/429)
-        for m in dict.fromkeys([model, DEMO_LLM_MODEL, 'openai']):
-            for d in (0, 25):
-                if d:
-                    time.sleep(d)
+    last_err = None
+    seen_errs = []
+    for prov in _llm_chain(cfg):
+        url = prov['base'] + prov['url_suffix']
+        headers = {'Content-Type': 'application/json',
+                   'User-Agent': 'CodeTime-Mentor/' + _ver()}
+        if prov['key']:
+            headers['Authorization'] = 'Bearer ' + prov['key']
+        base_payload = {'messages': messages, 'stream': False,
+                        'max_tokens': 4000}
+        base_payload.update(prov['extra'])
+        for m in prov['models']:
+            if not m:
+                continue
+            payload = dict(base_payload, model=m)
+            # резерв Pollinations: общий троттлинг по IP — одна пауза-повтор
+            attempts = (0, 22) if prov['mode'] == 'demo' else (0,)
+            for delay in attempts:
+                if delay:
+                    time.sleep(delay)
                 try:
-                    data = _http_json(base, dict(payload, model=m),
-                                      headers, timeout)
-                    return _parse_content(data)
+                    data = _http_json(url, payload, headers,
+                                      timeout or prov['timeout'])
+                    text = _parse_content(data)
+                    if prov['mode'] == 'gemini':
+                        st = _gemini_state()
+                        if st.get('model') != m or st.get('disabled_until'):
+                            st['model'] = m
+                            st.pop('disabled_until', None)
+                            st.pop('reason', None)
+                            _gemini_save(st)
+                    return text, prov['mode'], m
                 except MentorError as e:
                     last_err = e
-                    if '402' not in str(e) and '429' not in str(e):
-                        break  # не троттлинг — пробуем следующую модель
-        if last_err and ('402' in str(last_err) or '429' in str(last_err)):
+                    kind = _classify_error(e)
+                    if kind == 'region' and prov['mode'] == 'gemini':
+                        # Google блокирует регион — пауза на час, дальше по цепочке
+                        _gemini_save({'disabled_until':
+                                      (datetime.now() +
+                                       timedelta(minutes=GEMINI_DISABLE_MIN))
+                                      .isoformat(timespec='seconds'),
+                                      'reason': 'Google: регион не поддержан '
+                                                '(User location is not supported)'})
+                        logging.warning('Наставник: Gemini заблокирован по '
+                                        'региону, пауза %d минут',
+                                        GEMINI_DISABLE_MIN)
+                        break   # к следующему провайдеру
+                    if kind == 'model404':
+                        break       # этой модели нет — пробуем следующую
+                    if kind == 'throttle' and delay == attempts[-1]:
+                        break       # лимит — следующая модель/провайдер
+                    if kind == 'auth':
+                        break
+                    # сеть/прочее: у demo повтор с паузой, у прочих — дальше
+        if last_err and str(last_err) not in seen_errs:
+            seen_errs.append(str(last_err))
+    if last_err:
+        kind = _classify_error(last_err)
+        if kind == 'throttle' or kind == 'region':
             raise MentorError(
-                'Демо-ИИ перегружен (общий бесплатный лимит на всех). '
-                'Подождите 1–2 минуты и повторите — либо подключите '
-                'GitHub-токен или свой ключ в Настройках: там лимиты личные.')
-        raise last_err or MentorError('Демо-ИИ недоступен.')
-    headers['Authorization'] = 'Bearer ' + key
-    payload = {'model': model, 'messages': messages,
-               'temperature': 0.6, 'max_tokens': 4000, 'stream': False}
-    data = _http_json(base + '/chat/completions', payload, headers, timeout)
-    return _parse_content(data)
+                'Бесплатные ИИ перегружены или временно ограничены '
+                '(последняя причина: %s). Подождите 1–2 минуты и повторите — '
+                'либо вставьте свой ключ в Настройках Наставника: там лимиты '
+                'личные.' % _short_err(last_err))
+        raise MentorError('ИИ недоступен: %s Проверьте интернет и настройки '
+                          'Наставника.' % _short_err(last_err))
+    raise MentorError('ИИ недоступен: цепочка провайдеров пуста.')
 
 
 def _ver():
@@ -497,39 +676,39 @@ def _ver():
 
 
 def test_llm():
-    """Проверка ИИ: показывает, какой режим реально работает
-    (свой ключ / GitHub Models / демо без ключей)."""
+    """Проверка ИИ: прогоняет реальную цепочку (свой ключ > GitHub > Gemini >
+    резерв) и честно докладывает, какой режим работает, а какие упали и почему."""
     cfg = load_config()
-    base, key, model, mode = _llm_params(cfg, cfg['model'])
-    headers = {'User-Agent': 'CodeTime-Mentor/' + _ver()}
-    if mode == 'demo':
-        payload = {'model': DEMO_LLM_MODEL,
-                   'messages': [{'role': 'user', 'content': 'ping'}],
-                   'max_tokens': 30, 'stream': False,
-                   'referrer': DEMO_LLM_REFERRER}
-        headers['Content-Type'] = 'application/json'
-        _http_json(base, payload, headers, 60)
-        return {'ok': True, 'via': 'chat', 'mode': 'demo',
-                'model': DEMO_LLM_MODEL, 'models': []}
-    headers['Authorization'] = 'Bearer ' + key
-    url = base + '/models'
-    try:
-        data = _http_json(url, None, headers, 30)
-        ids = sorted({(m.get('id') or '?') for m in data.get('data', [])
-                      if isinstance(m, dict)})[:40]
-        return {'ok': True, 'via': 'models', 'mode': mode,
-                'model': model, 'models': ids}
-    except MentorError as e:
-        # /models есть не у всех — пробуем минимальный chat-запрос
-        if '404' not in str(e):
-            raise
-    payload = {'model': model or 'glm-4.6',
-               'messages': [{'role': 'user', 'content': 'ping'}],
-               'max_tokens': 5, 'stream': False}
-    headers['Content-Type'] = 'application/json'
-    _http_json(base + '/chat/completions', payload, headers, 60)
-    return {'ok': True, 'via': 'chat', 'mode': mode,
-            'model': model, 'models': []}
+    chain = _llm_chain(cfg, force_gemini=True)
+    headers = {'User-Agent': 'CodeTime-Mentor/' + _ver(),
+               'Content-Type': 'application/json'}
+    tried = []
+    for prov in chain:
+        url = prov['base'] + prov['url_suffix']
+        h = dict(headers)
+        if prov['key']:
+            h['Authorization'] = 'Bearer ' + prov['key']
+        for m in prov['models']:
+            if not m:
+                continue
+            payload = dict({'messages': [{'role': 'user', 'content': 'ping'}],
+                            'max_tokens': 30, 'stream': False,
+                            'model': m}, **prov['extra'])
+            try:
+                _http_json(url, payload, h, 45)
+                if prov['mode'] == 'gemini':
+                    _gemini_save({'model': m})
+                out = {'ok': True, 'mode': prov['mode'], 'model': m,
+                       'models': []}
+                if tried:
+                    out['fallbackNote'] = ('Основной режим не ответил: '
+                                           + '; '.join(t[:110] for t in tried))
+                return out
+            except MentorError as e:
+                tried.append('%s/%s: %s' % (prov['mode'], m, str(e)[:110]))
+                if _classify_error(e) == 'region':
+                    break
+    raise MentorError('Ни один ИИ не ответил. ' + ' | '.join(tried[-3:]))
 
 
 # ============================================================
@@ -658,7 +837,7 @@ def github_file(path):
 
 
 # ============================================================
-# Контекст чата: роль + журнал + план + снимок GitHub
+# Контекст чата: роль + журнал + план + заметки + макет + GitHub
 # ============================================================
 
 def _tail(s, limit):
@@ -666,14 +845,27 @@ def _tail(s, limit):
     return s[-limit:] if len(s) > limit else s
 
 
-def build_system_prompt(cfg):
+def build_system_prompt(cfg, mode='free'):
     role = _read(ROLE_PATH, DEFAULT_ROLE) or DEFAULT_ROLE
     journal = _read(JOURNAL_PATH)
     plan = _read(PLAN_PATH)
+    notes = _read(NOTES_PATH)
     p = role.strip()
     p += '\n\n=== ЖУРНАЛ ПРОГРЕССА (память о прошлых сессиях) ===\n' + _tail(journal, 7000)
     if plan.strip():
         p += '\n\n=== ДОРОЖНАЯ КАРТА (plan.md) ===\n' + _tail(plan, 3500)
+    notes_body = notes.replace(DEFAULT_NOTES, '').strip()
+    if notes_body:
+        p += ('\n\n=== ЗАМЕТКИ «ЗАПОМНИ» (notes/notes.md — студент просил '
+              'это запомнить; учитывай в ответах) ===\n' + _tail(notes_body, 3000))
+    # связка «макет → код»: последний разбор макета подставляется в код-ревью
+    if mode in ('code', 'free', 'dayend', 'task'):
+        lay = _read(LAYOUT_REVIEW_PATH)
+        if lay.strip():
+            p += ('\n\n=== ПОСЛЕДНИЙ РАЗБОР МАКЕТА (сделан раньше по фото; '
+                  'сверяй присланный код с этим разбором: что из макета '
+                  'реализовано, чего не хватает, где вёрстка расходится) ===\n'
+                  + _tail(lay, 5500))
     try:
         cache = json.loads(_read(GH_CACHE_PATH, '{}'))
         snap = cache.get('snapshot') or ''
@@ -683,6 +875,16 @@ def build_system_prompt(cfg):
                   % (cache.get('ts', '?'), _tail(snap, 5000)))
     except (ValueError, TypeError):
         pass
+    p += ('\n\n=== ПАПКА ПАМЯТИ (файлы, которые ты видишь) ===\n'
+          'journal.md — журнал; plan.md — план с чекбоксами «- [ ]» / «- [x]» '
+          '(в приложении их можно отмечать мышкой); notes/notes.md — заметки '
+          '«запомни»; history/ — переписка по дням; layouts/ — фото макетов и '
+          'последний разбор макета.\n\n'
+          'ПРАВИЛА ОТМЕТОК: когда студент освоил этап из плана — выдавай '
+          'обновлённый план.md блоком ```план ...``` целиком (со всеми '
+          'строками и галочками - [ ] / - [x]), приложение перезапишет '
+          'plan.md и чекбоксы обновятся. Когда студент говорит «запомни …» — '
+          'приложение само сохранит это в notes/notes.md; коротко подтверди.')
     return p
 
 
@@ -711,6 +913,7 @@ def load_history_tail(days=2, cap=30, msg_cap=8000):
 
 _FILE_RE = re.compile(r'(?:^|\n)\s*(?:файл|file)\s*:\s*([^\n]+)', re.IGNORECASE)
 _JOURNAL_BLOCK_RE = re.compile(r'```журнал\s*\n(.*?)```', re.IGNORECASE | re.DOTALL)
+_PLAN_BLOCK_RE = re.compile(r'```план\s*\n(.*?)```', re.IGNORECASE | re.DOTALL)
 
 
 def api_chat(data):
@@ -722,13 +925,24 @@ def api_chat(data):
         raise MentorError('Пустое сообщение.')
 
     cfg = load_config()
-    _base, _key, _model, llm_mode = _llm_params(cfg, cfg['model'])
-    if img_b64 and llm_mode == 'demo':
+    if img_b64 and not _vision_available(cfg):
         raise MentorError(
-            'В демо-режиме (без ключей) у модели нет «зрения» — фото макета '
-            'она не увидит. Подключите бесплатный ИИ по GitHub-токену '
-            '(мастер настройки: один токен даст и репозиторий, и '
-            'gpt-4.1-mini с фото) или любой свой ключ в Настройках.')
+            'У резервной демо-модели нет «зрения» — фото макета она не увидит '
+            '(встроенный Gemini сейчас недоступен). Подключите бесплатный ИИ '
+            'по GitHub-токену (один токен даст и репозиторий, и фото) или '
+            'любой свой ключ в Настройках — и попробуйте ещё раз.')
+
+    # «запомни вот это» — авто-заметка в notes/notes.md
+    note_saved = False
+    if msg and _REMEMBER_RE.search(msg) and len(msg) >= 12:
+        try:
+            ensure_all()
+            stamp = datetime.now().strftime('%d.%m.%Y %H:%M')
+            with open(NOTES_PATH, 'a', encoding='utf-8') as f:
+                f.write('\n\n---\n## Запомнить · %s\n\n%s\n' % (stamp, msg[:8000]))
+            note_saved = True
+        except OSError:
+            logging.exception('Наставник: не сохранилась заметка «запомни»')
 
     user_text = MODE_INSTRUCTIONS.get(mode, '')
     user_text = (user_text + '\n\n' + msg).strip() if user_text else msg
@@ -753,7 +967,7 @@ def api_chat(data):
                           'попросите его вставить код прямо в чат или добавить '
                           'токен в Настройках.)' % ', '.join(wanted))
 
-    messages = [{'role': 'system', 'content': build_system_prompt(cfg)}]
+    messages = [{'role': 'system', 'content': build_system_prompt(cfg, mode)}]
     messages.extend(load_history_tail())
     if img_b64:
         # фото макета: контент списком частей (OpenAI-совместимый vision-формат)
@@ -763,7 +977,7 @@ def api_chat(data):
              'image_url': {'url': 'data:%s;base64,%s' % (img_mime, img_b64)}},
         ]
         messages.append({'role': 'user', 'content': user_content})
-        model = cfg['vision_model'] or cfg['model']
+        model_hint = cfg['vision_model'] or cfg['model']
         # сохранить фото в layouts/
         try:
             ensure_all()
@@ -775,18 +989,29 @@ def api_chat(data):
             logging.exception('Наставник: не сохранилось фото макета')
     else:
         messages.append({'role': 'user', 'content': user_text})
-        model = cfg['model']
+        model_hint = cfg['model']
 
-    logging.info('Наставник: запрос к модели %s (режим %s, фото: %s)',
-                 model, mode, bool(img_b64))
-    reply = llm_chat(messages, model)
+    logging.info('Наставник: запрос (режим чата %s, фото: %s)', mode, bool(img_b64))
+    reply, used_mode, used_model = llm_chat(messages, model_hint)
+    logging.info('Наставник: ответил %s (режим %s)', used_model, used_mode)
 
     today = datetime.now().strftime('%Y-%m-%d')
     try:
         _append_history(today, 'user', msg if msg else '(фото макета)')
-        _append_history(today, 'assistant', reply)
+        _append_history(today, 'assistant', reply, model=used_model)
     except OSError:
         logging.exception('Наставник: не сохранилась история')
+
+    # связка «макет → код»: разбор макета сохраняем как контекст для кода
+    is_layout = bool(img_b64) or mode == 'layout'
+    if is_layout and reply:
+        try:
+            ensure_all()
+            stamp = datetime.now().strftime('%d.%m.%Y %H:%M')
+            _write(LAYOUT_REVIEW_PATH,
+                   'Разбор макета от %s\n\n%s' % (stamp, _tail(reply, 20000)))
+        except OSError:
+            logging.exception('Наставник: не сохранился last_review.md')
 
     # блоки ```журнал ...``` → автоматически в journal.md
     saved = False
@@ -794,16 +1019,28 @@ def api_chat(data):
         journal_append(block.strip())
         saved = True
 
-    return {'reply': reply, 'journalSaved': saved}
+    # блоки ```план ...``` → автоматически в plan.md (чекбоксы в Плане)
+    plan_saved = False
+    for block in _PLAN_BLOCK_RE.findall(reply):
+        body = block.strip()
+        if body:
+            _write(PLAN_PATH, body[:100000])
+            plan_saved = True
+
+    return {'reply': reply, 'journalSaved': saved, 'noteSaved': note_saved,
+            'planSaved': plan_saved, 'model': used_model, 'mode': used_mode}
 
 
-def _append_history(day, role, content):
+def _append_history(day, role, content, model=None):
     ensure_all()
     path = os.path.join(HISTORY_DIR, day + '.json')
     try:
         arr = json.loads(_read(path, '[]'))
     except (ValueError, TypeError):
         arr = []
-    arr.append({'role': role, 'content': content,
-                'ts': datetime.now().isoformat(timespec='seconds')})
+    entry = {'role': role, 'content': content,
+             'ts': datetime.now().isoformat(timespec='seconds')}
+    if model:
+        entry['model'] = model
+    arr.append(entry)
     _write(path, json.dumps(arr[-200:], ensure_ascii=False))
