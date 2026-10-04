@@ -473,6 +473,106 @@
   /* ---------- Пустые состояния ---------- */
   .empty { color: var(--muted); text-align: center; padding: 26px 10px; font-size: 14px; }
   .empty .big { font-size: 30px; display: block; margin-bottom: 8px; }
+  /* ---------- Наставник (v1.9.0) ---------- */
+  .m-subtabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .m-subtab {
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+    padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13.5px; font-family: inherit;
+  }
+  .m-subtab:hover { color: var(--text); }
+  .m-subtab.active { color: var(--green); background: var(--green-dim); border-color: rgba(16,185,129,.35); }
+  .m-pane { display: none; }
+  .m-pane.active { display: block; }
+  .m-chat-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .m-chat-head {
+    display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+    border-bottom: 1px solid var(--border); background: var(--panel2); flex-wrap: wrap;
+  }
+  .m-ava {
+    width: 34px; height: 34px; border-radius: 10px; background: var(--green-dim);
+    border: 1px solid rgba(16,185,129,.35); display: flex; align-items: center;
+    justify-content: center; font-size: 18px; flex: none;
+  }
+  .m-who b { display: block; font-size: 14px; }
+  .m-who span { font-size: 12px; color: var(--muted); }
+  .m-chat-head .right { margin-left: auto; }
+  .m-msgs {
+    height: 420px; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .m-msgs::-webkit-scrollbar { width: 8px; }
+  .m-msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .m-msg {
+    max-width: 86%; padding: 10px 14px; border-radius: 12px; font-size: 14px;
+    line-height: 1.55; word-wrap: break-word; overflow-wrap: break-word; white-space: pre-wrap;
+  }
+  .m-msg.user { align-self: flex-end; background: var(--green-dim); border: 1px solid rgba(16,185,129,.3); }
+  .m-msg.bot { align-self: flex-start; background: var(--panel2); border: 1px solid var(--border); }
+  .m-msg.bot h4 { margin: 8px 0 4px; font-size: 14px; }
+  .m-msg.bot pre {
+    background: #0b0e12; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; overflow-x: auto; margin: 8px 0; font-size: 12.5px;
+    font-family: Consolas, monospace; white-space: pre; line-height: 1.45;
+  }
+  .m-msg.bot code { font-family: Consolas, monospace; background: #0b0e12; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .m-msg.bot pre code { padding: 0; background: none; }
+  .m-msg .m-att { max-width: 260px; border-radius: 8px; margin-bottom: 6px; display: block; }
+  .m-note {
+    align-self: center; font-size: 12px; color: var(--green); background: var(--green-dim);
+    padding: 4px 12px; border-radius: 10px; border: 1px solid rgba(16,185,129,.3);
+  }
+  .m-chips { display: flex; gap: 8px; padding: 10px 16px 0; flex-wrap: wrap; }
+  .m-chip {
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+    border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+  }
+  .m-chip:hover { color: var(--green); border-color: rgba(16,185,129,.4); }
+  .m-inputrow { display: flex; gap: 8px; padding: 10px 16px 8px; align-items: flex-end; }
+  .m-inp {
+    flex: 1; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 14px;
+    resize: vertical; min-height: 44px; line-height: 1.4;
+  }
+  .m-inp:focus { outline: none; border-color: rgba(16,185,129,.5); }
+  .m-attach {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 10px; width: 44px; height: 44px; cursor: pointer; font-size: 18px; flex: none;
+  }
+  .m-attach:hover { color: var(--green); border-color: rgba(16,185,129,.4); }
+  .m-attach-row { display: flex; align-items: center; gap: 10px; padding: 0 16px 8px; }
+  .m-attach-row[hidden] { display: none; }   /* display:flex перебивает hidden */
+  .m-attach-row img { width: 54px; height: 54px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+  .muted-lbl { font-size: 12px; color: var(--muted); flex: 1; word-break: break-all; }
+  .m-wizard {
+    margin: 14px 16px 4px; border: 1px solid rgba(245,158,11,.4); background: var(--amber-dim);
+    border-radius: 12px; padding: 14px 16px; font-size: 13.5px; line-height: 1.55;
+  }
+  .m-wizard h4 { font-size: 14px; margin-bottom: 8px; }
+  .m-wizard ol { margin: 6px 0 10px 20px; }
+  .m-wizard a { color: var(--green); }
+  .m-wizard code { font-family: Consolas, monospace; background: rgba(15,17,20,.6); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .m-step { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed rgba(245,158,11,.3); }
+  .m-step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .m-wz-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .m-fld { margin-bottom: 12px; }
+  .m-fld > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .m-fld .inp { width: 100%; }
+  .m-statusline { font-size: 13px; margin-top: 6px; min-height: 18px; }
+  .m-ok { color: var(--green); }
+  .m-bad { color: var(--red); }
+  .m-area {
+    width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; font-family: Consolas, monospace; font-size: 13px;
+    line-height: 1.5; resize: vertical;
+  }
+  .m-area:focus { outline: none; border-color: rgba(16,185,129,.5); }
+  .m-pre {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; max-height: 420px; overflow: auto; font-size: 13px;
+    white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace;
+  }
+  .m-pre::-webkit-scrollbar, .m-area::-webkit-scrollbar { width: 8px; }
+  .m-pre::-webkit-scrollbar-thumb, .m-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 18px 0 26px; }
 </style>
 </head>
@@ -486,6 +586,7 @@
     <button class="tab" data-tab="projects">Проекты</button>
     <button class="tab" data-tab="plan">План</button>
     <button class="tab" data-tab="tasks">Задачи</button>
+    <button class="tab" data-tab="mentor">Наставник</button>
     <button class="tab" data-tab="achievements">Достижения</button>
     <button class="tab" data-tab="settings">Настройки</button>
   </nav>
@@ -633,6 +734,136 @@
         <button class="btn btn-ghost" id="delCancel" style="padding:8px 16px">Отмена</button>
       </div>
       <div id="tasksBoard"></div>
+    </div>
+  </section>
+
+  <!-- ================= НАСТАВНИК (ИИ-помощник, v1.9.0) ================= -->
+  <section id="tab-mentor" class="tabpane">
+    <div class="m-subtabs" id="mentorSubtabs">
+      <button class="m-subtab active" data-mt="chat">💬 Чат</button>
+      <button class="m-subtab" data-mt="plan">🗺 План</button>
+      <button class="m-subtab" data-mt="journal">📓 Журнал</button>
+      <button class="m-subtab" data-mt="settings">⚙️ Настройки</button>
+    </div>
+
+    <div class="m-pane active" id="m-pane-chat">
+      <div class="card m-chat-card">
+        <div class="m-chat-head">
+          <span class="m-ava">🤖</span>
+          <div class="m-who"><b>Наставник</b><span id="mentorModelLbl">Личный ИИ-помощник по фронтенду</span></div>
+          <span class="right">
+            <button class="btn btn-ghost" id="mentorClearChat" style="padding:7px 14px">Очистить чат</button>
+          </span>
+        </div>
+        <div id="mentorWizard" class="m-wizard" hidden></div>
+        <div class="m-msgs" id="mentorMsgs"></div>
+        <div class="m-chips">
+          <button class="m-chip" data-mode="code">🔎 Разбор кода</button>
+          <button class="m-chip" data-mode="layout">🖼 Разбор макета</button>
+          <button class="m-chip" data-mode="dayend">🏁 Конец дня</button>
+          <button class="m-chip" data-mode="task">🎯 Задача на завтра</button>
+        </div>
+        <div class="m-inputrow">
+          <button class="m-attach" id="mentorAttachBtn" title="Прикрепить фото макета (или Ctrl+V)">📎</button>
+          <textarea id="mentorInput" class="m-inp" rows="2"
+                    placeholder="Напишите наставнику… Пришлите код, фото макета или нажмите кнопку ниже. Ctrl+Enter — отправить"></textarea>
+          <button class="btn" id="mentorSendBtn" style="padding:10px 18px" title="Отправить">➤</button>
+        </div>
+        <div class="m-attach-row" id="mentorAttachRow" hidden>
+          <img id="mentorAttachThumb" alt="Прикреплённый макет">
+          <span id="mentorAttachName" class="muted-lbl"></span>
+          <button class="btn btn-ghost" id="mentorAttachDel" style="padding:5px 12px">Убрать</button>
+        </div>
+        <input type="file" id="mentorFile" accept="image/*" hidden>
+      </div>
+    </div>
+
+    <div class="m-pane" id="m-pane-plan">
+      <div class="card">
+        <h3 class="h3-flex"><span>Дорожная карта · plan.md</span>
+          <span class="right"><button class="btn" id="mentorPlanSave" style="padding:8px 18px">Сохранить</button></span></h3>
+        <textarea id="mentorPlanText" class="m-area" rows="18" spellcheck="false"></textarea>
+        <div class="hintline">Наставник читает этот файл в начале каждого разговора — здесь его представление о ваших целях. Правьте вручную или попросите наставника обновить план.</div>
+      </div>
+    </div>
+
+    <div class="m-pane" id="m-pane-journal">
+      <div class="card">
+        <h3 class="h3-flex"><span>Журнал прогресса · journal.md (память наставника)</span>
+          <span class="right" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost" id="mentorJournalCopy" style="padding:8px 14px">📋 Копировать</button>
+            <button class="btn btn-ghost" id="mentorOpenFolder" style="padding:8px 14px">📁 Открыть папку</button>
+          </span></h3>
+        <pre id="mentorJournalText" class="m-pre"></pre>
+        <div class="hintline">Чат потерялся или начался новый день? Скопируйте этот файл и вставьте его первым сообщением в новый чат — наставник продолжит ровно с того места, где остановились. Файл лежит в папке памяти и обычный, можно закинуть в свой git.</div>
+      </div>
+    </div>
+
+    <div class="m-pane" id="m-pane-settings">
+      <div class="card">
+        <h3>ИИ-подключение (любой OpenAI-совместимый API)</h3>
+        <div class="m-fld"><span>Провайдер — подставит адрес и модели, можно поменять</span>
+          <select class="inp" id="mPreset" style="max-width:420px">
+            <option value="">— выберите —</option>
+            <option value="zai">Z.ai (GLM-4.6, дешёвый и быстрый)</option>
+            <option value="openrouter">OpenRouter (много моделей, есть бесплатные)</option>
+            <option value="vsegpt">VseGPT (оплата картами РФ)</option>
+            <option value="custom">Другой OpenAI-совместимый</option>
+          </select></div>
+        <div class="m-fld"><span>Адрес API (base URL)</span>
+          <input class="inp" id="mBase" type="text" placeholder="https://api.z.ai/api/paas/v4"></div>
+        <div class="m-fld"><span>Ключ API (пусто = оставить прежний)</span>
+          <input class="inp" id="mKey" type="password" placeholder="sk-… / вставьте ключ"></div>
+        <div class="m-fld"><span>Модель для текста</span>
+          <input class="inp" id="mModel" type="text" placeholder="glm-4.6"></div>
+        <div class="m-fld"><span>Модель для фото макетов (vision)</span>
+          <input class="inp" id="mVision" type="text" placeholder="glm-4.5v"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="mSave" style="padding:9px 18px">Сохранить</button>
+          <button class="btn btn-ghost" id="mTestLlm" style="padding:9px 18px">Проверить ключ</button>
+        </div>
+        <div class="m-statusline" id="mTestLlmOut"></div>
+      </div>
+
+      <div class="card">
+        <h3>GitHub — доступ к вашему репозиторию с вёрсткой</h3>
+        <div class="m-fld"><span>Репозиторий (owner/имя)</span>
+          <input class="inp" id="mRepo" type="text" placeholder="Fankor70/my-shop"></div>
+        <div class="m-fld"><span>Токен GitHub — только чтение (пусто = оставить прежний)</span>
+          <input class="inp" id="mToken" type="password" placeholder="github_pat_…"></div>
+        <details style="margin-bottom:12px">
+          <summary style="cursor:pointer;color:var(--muted);font-size:13px">Как создать токен (2 минуты, только чтение)</summary>
+          <ol style="margin:10px 0 4px 20px;font-size:13.5px;line-height:1.6">
+            <li>Откройте на GitHub: <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</b>.</li>
+            <li>Имя: <code>codetime-mentor</code>, срок: 90 дней.</li>
+            <li><b>Repository access</b> → «Only select repositories» → выберите репозиторий с вёрсткой (приватный подойдёт).</li>
+            <li><b>Permissions → Repository permissions → Contents: Read-only</b> (Metadata включится сам). Больше ничего не давайте.</li>
+            <li>Generate → скопируйте токен <code>github_pat_…</code> → вставьте выше → «Сохранить».</li>
+          </ol>
+        </details>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="mSaveGh" style="padding:9px 18px">Сохранить</button>
+          <button class="btn btn-ghost" id="mTestGh" style="padding:9px 18px">Проверить доступ</button>
+          <button class="btn btn-ghost" id="mCollect" style="padding:9px 18px" title="Наставник посмотрит структуру репо и последние коммиты">Собрать снимок репозитория</button>
+        </div>
+        <div class="m-statusline" id="mGhOut"></div>
+        <div class="hintline">Зачем: наставник сможет сам читать ваши файлы и коммиты. В чате напишите «проверь мой код, файлы: index.html, styles/main.css» — он подтянет их из репозитория. Ничего никуда не загружается: только ваш ПК ↔ GitHub.</div>
+      </div>
+
+      <div class="card">
+        <h3>Роль наставника · role.txt</h3>
+        <textarea id="mRole" class="m-area" rows="12" spellcheck="false"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn" id="mRoleSave" style="padding:8px 18px">Сохранить роль</button>
+          <span class="hintline" style="margin:0">Характер, режимы работы и правила наставника. Меняйте под себя.</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Память</h3>
+        <div class="dbpath" id="mFolder">…</div>
+        <div class="hintline">Вся память наставника — обычные файлы в этой папке: журнал, план, роль, история чатов, фото макетов. Можно копировать, переносить, закоммитить в git.</div>
+      </div>
     </div>
   </section>
 
@@ -874,6 +1105,29 @@ function enableDemo() {
 }
 
 function demoPost(path, body) {
+  // Наставник: в демо отвечаем заготовленным разбором, чтобы предпросмотр был живым
+  if (path === '/api/mentor/chat') {
+    var reply = '**1) Баги и ошибки**\n\n' +
+      'В `pages/product.html` миниатюры галереи — обычные `<div>` с `onclick`. Клик по Enter не сработает, скринридер не поймёт, что это кнопка.\n\n' +
+      '**ДО:**\n```html\n<div class="thumb" onclick="show(1)">…</div>\n```\n' +
+      '**ПОСЛЕ:**\n```html\n<button class="thumb" type="button" onclick="show(1)">…</button>\n```\n\n' +
+      '**2) Семантика** — у счётчика количества нет связи с подписью: добавь `aria-label="Количество"`.\n\n' +
+      '**3) Адаптив** — ширины в `px`: замени на `rem`/`%`. Сетка товара: `grid-template-columns: 1fr 1.2fr` на десктопе, одна колонка с `600px`.\n\n' +
+      '```css\n.product { display: grid; gap: 2rem; }\n@media (min-width: 600px) {\n  .product { grid-template-columns: 1fr 1.2fr; }\n}\n```\n\n' +
+      'Оценка за сегодня: **5/10**. Вопрос: что должно происходить с миниатюрами на мобильном — горизонтальная лента или сетка 3×N?';
+    return Promise.resolve({ reply: reply, journalSaved: false });
+  }
+  if (path === '/api/mentor/config') {
+    return Promise.resolve({ folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: true,
+      apiBase: body.apiBase || '', model: body.model || '', visionModel: body.visionModel || '',
+      hasKey: !!(body.apiKey || ''), hasGhToken: !!(body.ghToken || ''), repo: body.repo || '',
+      rolePresent: true, journalPresent: true, ghSnapshot: false });
+  }
+  if (path === '/api/mentor/test-llm') return Promise.resolve({ ok: true, via: 'models', models: ['glm-4.6', 'glm-4.5v'] });
+  if (path === '/api/mentor/test-github') return Promise.resolve({ ok: true, fullName: 'Fankor70/product-page', private: true, defaultBranch: 'main' });
+  if (path === '/api/mentor/github-collect') return Promise.resolve({ ok: true, repo: 'Fankor70/product-page', branch: 'main', files: 12, commits: 8, ts: new Date().toISOString(), summary: 'Репозиторий Fankor70/product-page: 12 файлов, 8 последних коммитов. Теперь наставник видит структуру — попросите «проверь мой код, файлы: путь/к/файлу».' });
+  if (path === '/api/mentor/memory-save') return Promise.resolve({ ok: true, saved: Object.keys(body) });
+  if (path === '/api/mentor/journal-append') return Promise.resolve({ ok: true });
   showToast('Демо-режим: изменения не сохраняются');
   if (path === '/api/todos') {
     return Promise.resolve({ item: { id: -Date.now(), date: body.date,
@@ -1113,21 +1367,34 @@ function demoData(path) {
                      qs.to || isoDate(addDays(new Date(), 13)));
   }
   if (p === '/api/roadmap') return demoRoadmap();
+  if (p === '/api/mentor/status') {
+    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: false,
+             apiBase: '', model: '', visionModel: '',
+             hasKey: false, hasGhToken: false, repo: '',
+             rolePresent: true, journalPresent: true, ghSnapshot: false };
+  }
+  if (p === '/api/mentor/memory') {
+    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor',
+      role: 'Ты — «Наставник», личный наставник по фронтенду и строгий ревьюер кода студента…',
+      journal: '# Журнал прогресса\n\n(в демо пусто — в приложении здесь будут итоги каждой сессии)',
+      plan: '# Дорожная карта — Junior → Middle к апрелю 2027\n\n- [ ] Сентябрь: HTML/CSS + основы JS\n- [ ] Октябрь: JS-приложение на публичном API\n- [ ] Ноябрь: React\n- [ ] Декабрь: CRUD-мини-CRM + авторизация' };
+  }
+  if (p === '/api/mentor/history') return { date: isoDate(new Date()), messages: [] };
   if (p === '/api/settings') {
     return { dailyGoalMin: 120, trackClicks: true,
              trackKeys: true, paused: false, autostart: false,
              githubRepo: 'ivanov/CodeTime',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '1.8.1' };
+             version: '1.9.0' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '1.8.1', latest: '1.8.2',
-             tagName: 'v1.8.2', available: true,
-             assetName: 'CodeTime.exe', assetSize: 21764741,
-             releaseUrl: '#', notes: 'Самотест новой версии перед установкой — обновление больше не может сломать приложение' };
+    return { configured: true, current: '1.8.3', latest: '1.9.0',
+             tagName: 'v1.9.0', available: true,
+             assetName: 'CodeTime.exe', assetSize: 22001234,
+             releaseUrl: '#', notes: 'Добавлен Наставник — ИИ-помощник по фронтенду: чат, разбор макетов по фото, память в папке на ПК, чтение GitHub-репозитория, вкладка План' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '1.8.1', releases: demoReleases() };
+    return { configured: true, current: '1.8.3', releases: demoReleases() };
   }
   return undefined;
 }
@@ -2463,14 +2730,17 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
-    { tag: 'v1.8.2', version: '1.8.2', date: '2026-10-04', assetSize: 21764741,
-      notes: 'Самотест новой версии перед установкой — обновление больше не может сломать приложение; очистка временных папок; понятная диагностика.',
+    { tag: 'v1.9.0', version: '1.9.0', date: '2026-10-04', assetSize: 22001234,
+      notes: 'Наставник — ИИ-помощник по фронтенду: чат с любым OpenAI-совместимым API, разбор макетов по фото, память в папке на ПК (journal.md), чтение GitHub-репозитория, вкладка План.',
       relation: 'newer' },
+    { tag: 'v1.8.3', version: '1.8.3', date: '2026-10-04', assetSize: 21797803,
+      notes: 'Восстановлен интерфейс дашборда; CI-предохранитель: сборка падает, если dashboard.html повреждён.',
+      relation: 'current' },
+    { tag: 'v1.8.2', version: '1.8.2', date: '2026-10-04', assetSize: 21764741,
+      notes: 'Самотест новой версии перед установкой — обновление больше не может сломать приложение.',
+      relation: 'older' },
     { tag: 'v1.8.1', version: '1.8.1', date: '2026-10-04', assetSize: 21794537,
       notes: 'Надёжное обновление: докачка до точного размера, бэкап и автооткат, если новая версия не стартовала.',
-      relation: 'current' },
-    { tag: 'v1.8.0', version: '1.8.0', date: '2026-10-04', assetSize: 21790604,
-      notes: 'Выбор любой версии и откат; новый надёжный установщик; Проекты: период работы.',
       relation: 'older' }
   ];
 }
@@ -2485,9 +2755,9 @@ function demoLockInstall() {
 function loadReleases(silent) {
   if (DEMO) {
     RELEASES = demoReleases();
-    fillReleases('1.8.2');
+    fillReleases('1.9.0');
     demoLockInstall();
-    $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.8.2</b> (демо). ' +
+    $('updateStatus').innerHTML = 'Доступна новая версия <b>v1.9.0</b> (демо). ' +
       'В предпросмотре установка недоступна — запустите приложение CodeTime.';
     return;
   }
@@ -2581,6 +2851,383 @@ $('installBtn').addEventListener('click', function () {
 // список версий — один раз при открытии приложения (не спамим GitHub в 30-сек цикле)
 loadReleases(true);
 
+// ---------- Наставник (ИИ-помощник, v1.9.0) ----------
+
+var M = {
+  ready: false,          // инициализация выполнена один раз
+  sub: 'chat',           // активная под-вкладка
+  status: null,          // ответ /api/mentor/status
+  msgs: [],              // [{role, text, img}]
+  attach: null,          // {dataUrl, mime, b64, name}
+  journalNote: null,     // плашка «журнал записан»
+  sending: false
+};
+
+var M_MODE_HINT = {
+  code: 'Проверь мой код. Разбери по порядку: баги → семантика/доступность → адаптив/единицы → структура CSS → мелочи.',
+  layout: 'Разбери макет по фото: блоки и иерархия, сетка, отступы/шрифты/цвета, чего не хватает, поведение на мобильном. В конце — план вёрстки.',
+  dayend: 'Конец дня! Сверь план и итоги, дай вердикт с оценкой из 10, топ-3 проблемы с «до/после», обнови журнал и поставь задачу на завтра.',
+  task: 'Сформулируй задачу на завтра: Цель / Шаги / Критерий «готово» / Ограничения / Время / Навык.'
+};
+
+var M_PRESETS = {
+  zai:        { base: 'https://api.z.ai/api/paas/v4', model: 'glm-4.6', vision: 'glm-4.5v' },
+  openrouter: { base: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.5-flash', vision: 'google/gemini-2.5-flash' },
+  vsegpt:     { base: 'https://api.vsegpt.ru/v1', model: 'openai/gpt-4o-mini', vision: 'openai/gpt-4o-mini' },
+  custom:     { base: '', model: '', vision: '' }
+};
+
+function mentorPane(name) {
+  M.sub = name;
+  document.querySelectorAll('.m-subtab').forEach(function (b) {
+    b.classList.toggle('active', b.dataset.mt === name);
+  });
+  document.querySelectorAll('#tab-mentor .m-pane').forEach(function (p) {
+    p.classList.toggle('active', p.id === 'm-pane-' + name);
+  });
+  if (name === 'plan' || name === 'journal' || name === 'settings') mentorLoadMemory();
+  if (name === 'settings') mentorFillSettings();
+}
+
+function mentorInit() {
+  if (M.ready) return;
+  M.ready = true;
+  mentorLoadStatus();
+  mentorRestoreChat();
+  mentorPane('chat');
+}
+
+function mentorLoadStatus() {
+  api('/api/mentor/status').then(function (s) {
+    M.status = s;
+    mentorRenderWizard();
+    var lbl = $('mentorModelLbl');
+    if (lbl) lbl.textContent = s.configured
+      ? 'Модель: ' + (s.model || 'не задана') + (s.repo ? ' · GitHub: ' + s.repo : '')
+      : 'ИИ не подключён — заполните Настройки';
+  }).catch(function (e) {
+    showToast('Наставник: ' + e.message);
+  });
+}
+
+function mentorRenderWizard() {
+  var w = $('mentorWizard');
+  if (!w) return;
+  var s = M.status || {};
+  var steps = [];
+  if (!s.configured) {
+    steps.push('<div class="m-step"><b>Шаг 1 — подключить ИИ (2 минуты)</b>' +
+      '<ol><li><b>Z.ai</b> — <a href="https://z.ai" target="_blank" rel="noopener">z.ai</a> → регистрация → консоль → API Keys → Create. Модели: <code>glm-4.6</code>, для фото <code>glm-4.5v</code>.</li>' +
+      '<li><b>OpenRouter</b> — <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> → Create Key. Модель: например <code>google/gemini-2.5-flash</code>.</li>' +
+      '<li><b>VseGPT</b> (оплата картами РФ) — <a href="https://vsegpt.ru" target="_blank" rel="noopener">vsegpt.ru</a> → Кабинет → Ключи.</li></ol>' +
+      'Скопируйте ключ → «Настройки» → «Ключ API» → Сохранить → Проверить.' +
+      '<div class="m-wz-actions"><button class="btn wz-go-settings" style="padding:8px 16px">Открыть настройки</button></div></div>');
+  }
+  if (!s.hasGhToken) {
+    steps.push('<div class="m-step"><b>Шаг 2 — доступ к вашему GitHub</b> (нужно, чтобы наставник читал код из репозитория; можно пропустить)' +
+      '<ol><li>GitHub: <b>Settings → Developer settings → Personal access tokens → Fine-grained → Generate new token</b>.</li>' +
+      '<li>Имя <code>codetime-mentor</code>, срок 90 дней.</li>' +
+      '<li>Repository access → «Only select repositories» → выберите репозиторий с вёрсткой (приватный подойдёт).</li>' +
+      '<li>Permissions → Contents: <b>Read-only</b> — больше ничего.</li>' +
+      '<li>Generate → скопируйте <code>github_pat_…</code> → Настройки → «Токен GitHub» → Сохранить.</li></ol>' +
+      '<div class="m-wz-actions"><button class="btn wz-go-settings" style="padding:8px 16px">Открыть настройки</button></div></div>');
+  }
+  if (!steps.length) { w.hidden = true; w.innerHTML = ''; return; }
+  w.hidden = false;
+  w.innerHTML = '<h4>🚀 Первая настройка Наставника</h4>' + steps.join('');
+}
+
+// делегирование кнопок мастера (они перерисовываются)
+$('mentorWizard').addEventListener('click', function (e) {
+  if (e.target.closest('.wz-go-settings')) mentorPane('settings');
+});
+
+function mentorRestoreChat() {
+  api('/api/mentor/history').then(function (h) {
+    M.msgs = (h.messages || []).map(function (m) {
+      return { role: m.role === 'assistant' ? 'assistant' : 'user', text: m.content || '' };
+    });
+    mentorRenderMsgs();
+  }).catch(function () { /* демо-режим подхватит сам */ });
+}
+
+// мини-разметка: код, жирный, заголовки, списки (без внешних библиотек)
+function mdLite(s) {
+  s = esc(s);
+  s = s.replace(/```[^\n]*\n([\s\S]*?)```/g, function (_, code) {
+    return '<pre><code>' + code.replace(/\n$/, '') + '</code></pre>';
+  });
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+  s = s.replace(/^#{2,4} (.*)$/gm, '<h4>$1</h4>');
+  s = s.replace(/^\d+\. (.*)$/gm, '• $1');
+  s = s.replace(/^- (.*)$/gm, '• $1');
+  return s;
+}
+
+function mentorRenderMsgs() {
+  var box = $('mentorMsgs');
+  if (!M.msgs.length) {
+    box.innerHTML = '<div class="m-msg bot">Привет! Я твой Наставник. Пришли код или фото макета — разберу по-честному. Кнопки ниже: разбор кода, разбор макета, «конец дня», задача на завтра. Настрой меня один раз — и я буду помнить всё между разговорами.</div>';
+    return;
+  }
+  box.innerHTML = M.msgs.map(function (m) {
+    var att = m.img ? '<img class="m-att" src="' + m.img + '" alt="прикреплённый макет">' : '';
+    return '<div class="m-msg ' + (m.role === 'user' ? 'user' : 'bot') + '">' + att + mdLite(m.text) + '</div>';
+  }).join('') + (M.journalNote ? '<div class="m-note">📝 Записано в journal.md (Журнал)</div>' : '');
+  box.scrollTop = box.scrollHeight;
+}
+
+function mentorSend(mode) {
+  if (M.sending) return;
+  var inp = $('mentorInput');
+  var text = (inp.value || '').trim();
+  var hint = (mode && M_MODE_HINT[mode]) || '';
+  if (!text && !M.attach && !hint) return;
+  var s = M.status || {};
+  if (!s.configured && !DEMO) {
+    mentorPane('settings');
+    showToast('Сначала подключите ИИ: настройки Наставника, шаг 1');
+    return;
+  }
+  M.msgs.push({ role: 'user', text: text || hint, img: M.attach ? M.attach.dataUrl : null });
+  var payload = { message: text || hint, mode: mode || 'free' };
+  if (M.attach) { payload.imageB64 = M.attach.b64; payload.imageMime = M.attach.mime; }
+  M.sending = true;
+  M.journalNote = null;
+  inp.value = '';
+  mentorClearAttach();
+  mentorRenderMsgs();
+  var box = $('mentorMsgs');
+  var think = document.createElement('div');
+  think.className = 'm-msg bot';
+  think.innerHTML = '<span class="spinner"></span>Думаю, не закрывайте вкладку…';
+  box.appendChild(think);
+  box.scrollTop = box.scrollHeight;
+  apiPost('/api/mentor/chat', payload).then(function (r) {
+    M.journalNote = r.journalSaved
+      ? '<div class="m-note">📝 Записано в journal.md (Журнал)</div>' : null;
+    M.msgs.push({ role: 'assistant', text: r.reply || '(пустой ответ)' });
+  }).catch(function (e) {
+    M.msgs.push({ role: 'assistant', text: '⚠️ ' + (e.message || 'Неизвестная ошибка') +
+      '\n\nПроверьте Настройки Наставника (ключ, модель) и подключение к интернету, затем попробуйте ещё раз.' });
+  }).then(function () {
+    M.sending = false;
+    mentorRenderMsgs();
+    M.memory = null;   // журнал мог обновиться — перечитаем при открытии
+  });
+}
+
+function mentorClearAttach() {
+  M.attach = null;
+  $('mentorAttachRow').hidden = true;
+}
+
+function mentorSetAttach(file) {
+  if (!file || !/^image\//.test(file.type || '')) {
+    showToast('Нужна картинка (png/jpg/веб-скриншот)');
+    return;
+  }
+  var rd = new FileReader();
+  rd.onload = function () {
+    var img = new Image();
+    img.onload = function () {
+      // ужать до 1600px по большой стороне — быстрее и дешевле для API
+      var k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      var c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k));
+      c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      var dataUrl = c.toDataURL('image/jpeg', 0.85);
+      M.attach = { dataUrl: dataUrl, mime: 'image/jpeg',
+                   b64: dataUrl.split(',')[1], name: file.name || 'clipboard' };
+      $('mentorAttachThumb').src = dataUrl;
+      $('mentorAttachName').textContent = (file.name || 'из буфера') +
+        ' → ' + c.width + '×' + c.height;
+      $('mentorAttachRow').hidden = false;
+    };
+    img.onerror = function () { showToast('Не удалось прочитать картинку'); };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(file);
+}
+
+// ---------- память: план / журнал / роль / настройки ----------
+
+function mentorLoadMemory() {
+  api('/api/mentor/memory').then(function (m) {
+    M.memory = m;
+    var planEl = $('mentorPlanText');
+    if (document.activeElement !== planEl) planEl.value = m.plan || '';
+    $('mentorJournalText').textContent = m.journal || '(пусто)';
+    var roleEl = $('mRole');
+    if (document.activeElement !== roleEl) roleEl.value = m.role || '';
+    if (m.folder) $('mFolder').textContent = m.folder;
+  }).catch(function () { /* демо */ });
+}
+
+function mentorFillSettings() {
+  var s = M.status || {};
+  $('mBase').value = s.apiBase || '';
+  $('mModel').value = s.model || '';
+  $('mVision').value = s.visionModel || '';
+  $('mRepo').value = s.repo || '';
+  $('mFolder').textContent = s.folder || (M.memory && M.memory.folder) || '…';
+}
+
+function mentorSaveAll() {
+  var body = {
+    apiBase: $('mBase').value.trim(),
+    model: $('mModel').value.trim(),
+    visionModel: $('mVision').value.trim(),
+    repo: $('mRepo').value.trim()
+  };
+  if ($('mKey').value.trim()) body.apiKey = $('mKey').value.trim();
+  if ($('mToken').value.trim()) body.ghToken = $('mToken').value.trim();
+  return apiPost('/api/mentor/config', body).then(function (st) {
+    M.status = st;
+    mentorRenderWizard();
+    mentorFillSettings();
+    var lbl = $('mentorModelLbl');
+    if (lbl) lbl.textContent = st.configured
+      ? 'Модель: ' + (st.model || 'не задана') + (st.repo ? ' · GitHub: ' + st.repo : '')
+      : 'ИИ не подключён — заполните Настройки';
+    return st;
+  });
+}
+
+$('mSave').addEventListener('click', function () {
+  mentorSaveAll()
+    .then(function () { showToast('Настройки ИИ сохранены'); })
+    .catch(function (e) { showToast('Ошибка: ' + e.message); });
+});
+
+$('mSaveGh').addEventListener('click', function () {
+  mentorSaveAll()
+    .then(function () { showToast('GitHub-настройки сохранены'); })
+    .catch(function (e) { showToast('Ошибка: ' + e.message); });
+});
+
+$('mTestLlm').addEventListener('click', function () {
+  var out = $('mTestLlmOut');
+  out.innerHTML = '<span class="spinner"></span>Сохраняю и проверяю ключ…';
+  mentorSaveAll().then(function () {
+    return apiPost('/api/mentor/test-llm', {});
+  }).then(function (r) {
+    out.innerHTML = '<span class="m-ok">✓ Ключ работает' +
+      (r.models && r.models.length
+        ? '. Доступные модели: ' + esc(r.models.slice(0, 8).join(', ')) : '') + '</span>';
+  }).catch(function (e) {
+    out.innerHTML = '<span class="m-bad">✗ ' + esc(e.message) + '</span>';
+  });
+});
+
+$('mTestGh').addEventListener('click', function () {
+  var out = $('mGhOut');
+  out.innerHTML = '<span class="spinner"></span>Сохраняю и проверяю доступ…';
+  mentorSaveAll().then(function () {
+    return apiPost('/api/mentor/test-github', {});
+  }).then(function (r) {
+    out.innerHTML = '<span class="m-ok">✓ Доступ есть: ' + esc(r.fullName) +
+      (r.private ? ' (приватный)' : '') + ', ветка ' + esc(r.defaultBranch || '?') + '</span>';
+  }).catch(function (e) {
+    out.innerHTML = '<span class="m-bad">✗ ' + esc(e.message) + '</span>';
+  });
+});
+
+$('mCollect').addEventListener('click', function () {
+  var out = $('mGhOut');
+  out.innerHTML = '<span class="spinner"></span>Собираю снимок репозитория…';
+  apiPost('/api/mentor/github-collect', {}).then(function (r) {
+    out.innerHTML = '<span class="m-ok">✓ ' + esc(r.summary || ('Собрано: ' + r.files + ' файлов, ' + r.commits + ' коммитов')) + '</span>';
+  }).catch(function (e) {
+    out.innerHTML = '<span class="m-bad">✗ ' + esc(e.message) + '</span>';
+  });
+});
+
+$('mPreset').addEventListener('change', function () {
+  var p = M_PRESETS[this.value];
+  if (!p) return;
+  $('mBase').value = p.base;
+  $('mModel').value = p.model;
+  $('mVision').value = p.vision;
+});
+
+$('mentorPlanSave').addEventListener('click', function () {
+  apiPost('/api/mentor/memory-save', { plan: $('mentorPlanText').value })
+    .then(function () { showToast('plan.md сохранён'); })
+    .catch(function (e) { showToast('Ошибка: ' + e.message); });
+});
+
+$('mRoleSave').addEventListener('click', function () {
+  apiPost('/api/mentor/memory-save', { role: $('mRole').value })
+    .then(function () { showToast('role.txt сохранён'); })
+    .catch(function (e) { showToast('Ошибка: ' + e.message); });
+});
+
+$('mentorJournalCopy').addEventListener('click', function () {
+  var txt = $('mentorJournalText').textContent || '';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt)
+      .then(function () { showToast('Журнал скопирован — вставьте его в новый чат'); })
+      .catch(function () { showToast('Не скопировалось — откройте файл в папке памяти'); });
+  } else {
+    showToast('Откройте файл в папке памяти и скопируйте там');
+  }
+});
+
+$('mentorOpenFolder').addEventListener('click', function () {
+  if (DEMO) { showToast('Демо-режим: папка появится в приложении'); return; }
+  apiPost('/api/mentor/open-folder', {}).catch(function (e) {
+    showToast('Ошибка: ' + e.message);
+  });
+});
+
+// ---------- обработчики чата ----------
+
+$('mentorSendBtn').addEventListener('click', function () { mentorSend(null); });
+
+$('mentorInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    mentorSend(null);
+  }
+});
+
+$('mentorAttachBtn').addEventListener('click', function () { $('mentorFile').click(); });
+
+$('mentorFile').addEventListener('change', function () {
+  var f = this.files && this.files[0];
+  this.value = '';
+  if (f) mentorSetAttach(f);
+});
+
+$('mentorAttachDel').addEventListener('click', mentorClearAttach);
+
+document.querySelector('#tab-mentor .m-chips').addEventListener('click', function (e) {
+  var c = e.target.closest('.m-chip');
+  if (c) mentorSend(c.dataset.mode);
+});
+
+$('mentorClearChat').addEventListener('click', function () {
+  M.msgs = [];
+  M.journalNote = null;
+  mentorRenderMsgs();
+});
+
+// скриншот макета вставкой из буфера (Ctrl+V) на вкладке Наставника
+document.addEventListener('paste', function (e) {
+  if (state.tab !== 'mentor') return;
+  var items = (e.clipboardData || {}).items || [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type && items[i].type.indexOf('image') === 0) {
+      mentorSetAttach(items[i].getAsFile());
+      e.preventDefault();
+      break;
+    }
+  }
+});
+
 // ---------- общий цикл обновления ----------
 
 function refresh() {
@@ -2597,6 +3244,7 @@ function refresh() {
   else if (state.tab === 'tasks') loadTasks();
   else if (state.tab === 'achievements') loadAchievements();
   else if (state.tab === 'settings') loadSettings();
+  else if (state.tab === 'mentor') mentorInit();   // чат НЕ перерисовываем по таймеру
 }
 
 renderPdrops();

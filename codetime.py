@@ -22,6 +22,11 @@ CodeTime — тихий фоновый трекер времени, провод
     последовательно «заливаются» в шаги, у каждого шага виден прогресс.
   * Задачи («Задачи»): по дням, с группировкой сегодня/завтра/послезавтра/
     через неделю/позже, режим массового удаления.
+  * Наставник («Наставник», v1.9.0): ИИ-помощник по фронтенду — чат с
+    любым OpenAI-совместимым API, фото макетов (vision), память в папке
+    %USERPROFILE%/CodeTimeMentor (journal.md/plan.md/role.txt/история),
+    чтение GitHub-репозитория студента через read-only токен.
+    См. mentor.py — все его роуты начинаются с /api/mentor/*.
   * Самообновление через GitHub Releases: приложение само проверяет
     последний релиз, скачивает новый CodeTime.exe и подменяет себя
     (Настройки → Обновление).
@@ -50,12 +55,14 @@ from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
+import mentor   # Наставник: ИИ-помощник по фронтенду (stdlib-only модуль)
+
 # ============================================================
 # Константы
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '1.8.3'
+APP_VERSION = '1.9.0'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
@@ -1806,6 +1813,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._api_update_releases()
         if route == '/api/update/status':
             return self._api_update_status()
+        if route == '/api/mentor/status':
+            return self._json(mentor.api_status())
+        if route == '/api/mentor/memory':
+            return self._json(mentor.api_memory())
+        if route == '/api/mentor/history':
+            return self._json(mentor.api_history(qs))
         return self._json({'error': 'Не найдено'}, code=404)
 
     def _serve_dashboard(self):
@@ -2060,6 +2073,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._api_settings_post()   # исторический роут (старый формат разбора)
         if route == '/api/update':
             return self._api_update()          # сырые байты exe, не JSON
+        if route.startswith('/api/mentor/'):
+            return self._mentor_post(route)
         handler = self.POST_ROUTES.get(route)
         if handler is None:
             return self._json({'error': 'Не найдено'}, code=404)
@@ -2075,6 +2090,25 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as e:
             # ошибки валидации тела -> 400 {error}
             return self._json({'error': str(e)}, code=400)
+
+    def _mentor_post(self, route):
+        """POST /api/mentor/* — диспетчер в mentor.py с понятными ошибками.
+        Тело может быть большим (фото макета в base64), читаем целиком."""
+        try:
+            length = int(self.headers.get('Content-Length') or 0)
+            data = json.loads(self.rfile.read(length).decode('utf-8') or '{}')
+        except (ValueError, UnicodeDecodeError) as e:
+            return self._json({'error': 'Некорректный JSON: %r' % e}, code=400)
+        if not isinstance(data, dict):
+            return self._json({'error': 'Ожидался JSON-объект'}, code=400)
+        try:
+            return self._json(mentor.api_post(route, data))
+        except mentor.MentorError as e:
+            return self._json({'error': str(e)}, code=400)
+        except Exception as e:
+            logging.exception('Наставник: ошибка обработки %s: %r', route, e)
+            return self._json({'error': 'Внутренняя ошибка Наставника: %s' % e},
+                              code=500)
 
     def _api_settings_post(self):
         try:
@@ -3137,6 +3171,12 @@ def main():
     _t_mei.start()
 
     logging.info('CodeTime %s запускается...', APP_VERSION)
+
+    # Наставник: папка памяти %USERPROFILE%\CodeTimeMentor и файлы по умолчанию
+    try:
+        mentor.ensure_all()
+    except Exception as e:
+        logging.warning('Наставник: не удалось подготовить папку: %r', e)
 
     app = CodeTimeApp()
     APP = app
