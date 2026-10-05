@@ -76,6 +76,37 @@
     background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.8);
   }
   .side-foot .ver { margin-left: auto; font-variant-numeric: tabular-nums; }
+  /* кнопка сворачивания сайдбара */
+  .side-brand-collapse {
+    margin-left: auto; background: none; border: 1px solid transparent; color: var(--muted);
+    cursor: pointer; padding: 6px; border-radius: 8px; display: inline-flex; flex: none;
+    transition: all .15s;
+  }
+  .side-brand-collapse:hover { color: var(--text); background: var(--panel2); border-color: var(--border); }
+  /* свернутый сайдбар: только иконки */
+  body.side-min .sidenav { width: 64px; }
+  body.side-min .brand-txt, body.side-min .side-label, body.side-min .side-item span { display: none; }
+  body.side-min .side-brand { flex-direction: column; gap: 8px; padding: 14px 8px 8px; align-items: center; }
+  body.side-min .side-brand-collapse { margin-left: 0; }
+  body.side-min .side-brand-collapse svg { transform: rotate(180deg); }
+  body.side-min .side-item { justify-content: center; padding: 10px 0; }
+  body.side-min .side-foot { justify-content: center; flex-direction: column; gap: 6px; padding: 12px 6px; }
+  body.side-min .side-foot .ver { margin-left: 0; font-size: 10px; }
+  body.side-min .side-foot span:not(.dot):not(.ver) { display: none; }
+  /* подсказка-тултип на свернутых иконках */
+  body.side-min .side-item { position: relative; }
+  body.side-min .side-item::after {
+    content: attr(data-title); position: absolute; left: calc(100% + 10px); top: 50%;
+    transform: translateY(-50%); background: #0d1117; border: 1px solid var(--border);
+    padding: 4px 10px; border-radius: 8px; font-size: 12px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 70; color: var(--text);
+  }
+  body.side-min .side-item:hover::after { opacity: 1; }
+  @media (max-width: 880px) {
+    body.side-min .sidenav { width: 242px; }
+    body.side-min .brand-txt, body.side-min .side-label, body.side-min .side-item span { display: revert; }
+    body.side-min .side-item::after { content: none; }
+  }
   .side-scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55; }
   .side-scrim[hidden] { display: none; }
   /* в демо-режиме баннер сверху сдвигает .app — сайдбар растягиваем по содержимому (только десктоп) */
@@ -90,7 +121,7 @@
   }
   .top-title { font-size: 15px; font-weight: 700; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .side-burger { display: none; }
-  main { flex: 1; width: 100%; max-width: 1120px; margin: 0 auto; padding: 20px 22px 8px; }
+  main { flex: 1; width: 100%; max-width: 1340px; margin: 0 auto; padding: 20px 26px 8px; }
   footer { margin-top: auto; text-align: center; color: var(--muted); font-size: 12px; padding: 18px 0 26px; }
   @media (max-width: 880px) {
     .sidenav {
@@ -565,7 +596,7 @@
   .m-msgs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
   .m-msgs::-webkit-scrollbar-thumb:hover { background: #3a4350; }
   /* Ряд сообщения: бот — аватар + колонка, юзер — пузырь справа */
-  .m-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; max-width: 920px; margin: 0 auto; }
+  .m-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; max-width: 1080px; margin: 0 auto; }
   .m-row.u-row { justify-content: flex-end; }
   .m-ava-sm {
     width: 34px; height: 34px; border-radius: 50%; flex: none;
@@ -584,7 +615,7 @@
     word-wrap: break-word; overflow-wrap: break-word; min-width: 0;
   }
   .m-msg.user {
-    max-width: min(80%, 660px); width: fit-content;
+    max-width: min(80%, 760px); width: fit-content;
     background: #262e3b; border: 1px solid #313b4a;
     border-radius: 18px 18px 6px 18px; padding: 10px 16px;
     font-size: 14.5px;
@@ -592,18 +623,23 @@
   .m-msg.user p { margin: 0; }
   .m-msg.user p + p { margin-top: 8px; }
   :is(.m-msg.bot,.c-bub) { align-self: stretch; width: 100%; }
-  :is(.m-msg.bot,.c-bub) p { margin: 0 0 10px; }
+  :is(.m-msg.bot,.c-bub) p { margin: 0 0 12px; }
+  :is(.m-msg.bot,.c-bub) p:last-child { margin-bottom: 0; }
   /* настоящие блочные элементы разметки */
   :is(.m-msg.bot,.c-bub) .md-h1 { font-size: 17.5px; font-weight: 700; margin: 16px 0 8px; line-height: 1.4; }
   :is(.m-msg.bot,.c-bub) .md-h2 { font-size: 15.5px; font-weight: 700; margin: 14px 0 6px; line-height: 1.4; }
   :is(.m-msg.bot,.c-bub) .md-h3 { font-size: 14.5px; font-weight: 700; margin: 12px 0 5px; line-height: 1.4; }
   :is(.m-msg.bot,.c-bub) .md-h:first-child { margin-top: 0; }
-  :is(.m-msg.bot,.c-bub) ul, :is(.m-msg.bot,.c-bub) ol { margin: 0 0 10px; padding-left: 22px; }
+  :is(.m-msg.bot,.c-bub) ul, :is(.m-msg.bot,.c-bub) ol { margin: 2px 0 14px; padding-left: 26px; }
   :is(.m-msg.bot,.c-bub) ul { list-style: disc; }
   :is(.m-msg.bot,.c-bub) ul ul { list-style: circle; }
   :is(.m-msg.bot,.c-bub) ol { list-style: decimal; }
-  :is(.m-msg.bot,.c-bub) li { margin: 3px 0; }
+  :is(.m-msg.bot,.c-bub) li { margin: 7px 0; padding-left: 2px; }
+  :is(.m-msg.bot,.c-bub) li:last-child { margin-bottom: 2px; }
   :is(.m-msg.bot,.c-bub) li::marker { color: var(--muted); }
+  /* нумерованные пункты — как в эталоне: яркий номер, чёткая структура */
+  :is(.m-msg.bot,.c-bub) ol > li::marker { color: var(--green); font-weight: 700; }
+  :is(.m-msg.bot,.c-bub) ul > li::marker { color: var(--green); }
   :is(.m-msg.bot,.c-bub) ul.md-tasks { list-style: none; padding-left: 2px; }
   :is(.m-msg.bot,.c-bub) ul.md-tasks ul { list-style: disc; padding-left: 22px; }
   .md-task { display: flex; gap: 9px; align-items: flex-start; }
@@ -706,7 +742,15 @@
   .hl-a { color: #7ee787; }                          /* атрибуты/свойства */
   :is(.m-msg.bot,.c-bub) code {
     font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-    background: rgba(110,118,129,.22); padding: 1.5px 6px; border-radius: 6px; font-size: .92em;
+    background: rgba(46,160,67,.16); color: #7ee787;
+    border: 1px solid rgba(46,160,67,.22);
+    padding: 1.5px 6px; border-radius: 6px; font-size: .92em;
+  }
+  /* бейдж пути файла: [styles/product.css] — как в эталоне */
+  :is(.m-msg.bot,.c-bub) code.md-path {
+    background: rgba(139,148,158,.14); color: #79c0ff;
+    border: 1px solid rgba(121,192,255,.25);
+    font-weight: 600;
   }
   :is(.m-msg.bot,.c-bub) pre.m-code {
     position: relative; background: #0d1117; border: 1px solid var(--border);
@@ -726,6 +770,7 @@
     border-radius: 5px; font-size: 11px; padding: 1px 8px; cursor: pointer; font-family: inherit;
   }
   .m-code-copy:hover { color: var(--text); border-color: rgba(16,185,129,.5); }
+  :is(.m-msg.bot,.c-bub) b { color: #fff; font-weight: 700; }
   .md-hr { display: block; height: 1px; border: none; background: var(--border); margin: 12px 0; }
   /* ---------- сворачивание длинных ответов ---------- */
   .m-wrap { display: flex; flex-direction: column; align-self: stretch; min-width: 0; }
@@ -923,7 +968,11 @@
   .chat-side {
     width: 250px; flex: none; border-right: 1px solid var(--border);
     display: flex; flex-direction: column; background: rgba(28,35,46,.5);
+    transition: width .18s ease, padding .18s ease;
   }
+  /* v2.5.0: свернутая панель чатов — чат шире */
+  .chat-side.min { width: 0; border-right: none; overflow: hidden; }
+  .chat-side.min .chat-new, .chat-side.min .chat-list { display: none; }
   .chat-new { margin: 12px; border-radius: 9px; }
   .chat-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 3px; }
   .chat-list::-webkit-scrollbar { width: 8px; }
@@ -950,6 +999,7 @@
   }
   .chat-title { font-size: 14px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
   .chat-burger { display: none; padding: 7px 12px; }
+  @media (min-width: 901px) { .chat-burger { display: inline-flex; } }
   .chat-msgs {
     flex: 1; overflow-y: auto; padding: 18px 16px; display: flex; flex-direction: column;
     gap: 16px; scroll-behavior: smooth;
@@ -985,8 +1035,8 @@
     border: 1px solid var(--border); background: var(--panel2); border-radius: 8px; padding: 4px 8px; color: var(--text);
   }
   /* сообщения чата: пузыри (эталон) */
-  .c-col { width: 100%; max-width: 860px; min-width: 0; margin: 0 auto; }
-  .c-row { display: flex; width: 100%; max-width: 860px; margin: 0 auto; }
+  .c-col { width: 100%; max-width: 1000px; min-width: 0; margin: 0 auto; }
+  .c-row { display: flex; width: 100%; max-width: 1000px; margin: 0 auto; }
   .c-row.u { justify-content: flex-end; }
   .c-bub { max-width: 88%; border-radius: 12px; border: 1px solid var(--border); padding: 9px 13px; font-size: 14px; line-height: 1.55; }
   .c-bub.u {
@@ -994,7 +1044,7 @@
     white-space: pre-wrap; word-break: break-word;
   }
   .c-bub.u code { font-family: ui-monospace, Consolas, monospace; background: rgba(110,118,129,.22); padding: 1px 5px; border-radius: 5px; font-size: .92em; }
-  .c-bub.b { background: var(--panel2); width: 100%; max-width: 860px; }
+  .c-bub.b { background: var(--panel2); width: 100%; max-width: 1000px; }
   .c-bub.b.err { border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.06); }
   .c-img { max-width: 240px; max-height: 180px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 6px; display: block; }
   .c-note { font-size: 11px; color: var(--muted); margin-top: 4px; }
@@ -1004,7 +1054,20 @@
   .c-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 7px; }
   .c-copy { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; font-family: inherit; padding: 0; }
   .c-copy:hover { color: var(--green); }
-  /* план наставника: карточки пунктов */
+  /* план наставника: месяцы → модули → задачи */
+  .np-month { margin-bottom: 18px; }
+  .np-month > h4 {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 10px;
+    font-size: 16px; color: var(--text);
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .np-month > h4 .chip { background: var(--green-dim); color: var(--green); border-color: rgba(16,185,129,.3); }
+  .np-mod { margin: 0 0 12px 10px; }
+  .np-mod > b {
+    display: block; font-size: 13.5px; color: var(--muted); text-transform: none;
+    margin: 0 0 8px; padding-left: 2px;
+  }
+  .np-mod > b::before { content: '▸ '; color: var(--green); }
   .nplan-item {
     display: flex; gap: 12px; align-items: flex-start; background: var(--panel);
     border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
@@ -1042,6 +1105,17 @@
   .gh-entry .p { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gh-entry .sz { font-size: 11px; color: var(--muted); flex: none; }
   .gh-back { background: none; border: none; color: var(--green); cursor: pointer; font-size: 13px; font-family: inherit; padding: 0; }
+  /* дружелюбная ошибка в модалке GitHub */
+  .gh-err { text-align: center; padding: 26px 18px; }
+  .gh-err .gh-err-ico { font-size: 30px; margin-bottom: 8px; }
+  .gh-err b { display: block; margin-bottom: 6px; font-size: 14.5px; }
+  .gh-err p { margin: 0 auto 14px; max-width: 420px; }
+  /* журнал: свёрстанный просмотр */
+  .nj-view { font-size: 14.5px; line-height: 1.65; }
+  .nj-view:empty::after { content: 'Журнала пока нет — проведи первую сессию с наставником.'; color: var(--muted); font-size: 13.5px; }
+  .nj-md { font-size: 14px; line-height: 1.6; }
+  .nj-md p { margin: 0 0 8px; }
+  .nj-md p:last-child { margin-bottom: 0; }
   /* мобильный сайдбар чата */
   @media (max-width: 760px) {
     .chat-wrap { height: calc(100vh - 152px); min-height: 420px; }
@@ -1091,21 +1165,24 @@
         <b>Наставник по фронтенду</b>
         <span>Junior/Middle · апрель 2027</span>
       </div>
+      <button class="side-brand-collapse" id="sideCollapse" title="Свернуть/развернуть панель" aria-label="Свернуть боковую панель">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+      </button>
     </div>
     <nav class="side-nav" id="tabs" aria-label="Разделы">
       <p class="side-label" aria-hidden="true">AI-помощник</p>
-      <button class="side-item active" data-nav="team" aria-current="page"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Команда</span></button>
-      <button class="side-item" data-nav="chat"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Чат</span></button>
-      <button class="side-item" data-nav="nplan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 17 2 2 4-4"/><path d="M9 7h6"/></svg><span>План</span></button>
-      <button class="side-item" data-nav="njournal"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>Журнал</span></button>
-      <button class="side-item" data-nav="nsettings"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span>Настройки</span></button>
+      <button class="side-item active" data-nav="team" data-title="Команда" aria-current="page"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Команда</span></button>
+      <button class="side-item" data-nav="chat" data-title="Чат"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Чат</span></button>
+      <button class="side-item" data-nav="nplan" data-title="План"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 17 2 2 4-4"/><path d="M9 7h6"/></svg><span>План</span></button>
+      <button class="side-item" data-nav="njournal" data-title="Журнал"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>Журнал</span></button>
+      <button class="side-item" data-nav="nsettings" data-title="Настройки"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span>Настройки</span></button>
       <p class="side-label" aria-hidden="true">Трекер кода</p>
-      <button class="side-item" data-nav="codetime"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg><span>CodeTime</span></button>
+      <button class="side-item" data-nav="codetime" data-title="CodeTime"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg><span>CodeTime</span></button>
     </nav>
     <div class="side-foot">
       <span class="dot" aria-hidden="true"></span>
       <span>Всё локально на ПК</span>
-      <span class="ver" id="sideVersion">v2.4.3</span>
+      <span class="ver" id="sideVersion">v2.5.0</span>
     </div>
   </aside>
 
@@ -1177,6 +1254,7 @@
         <div class="chat-top">
           <button class="btn btn-ghost chat-burger" id="chatBurger" aria-label="Список чатов">☰</button>
           <span class="chat-title" id="chatTitle">Новый чат</span>
+          <span class="mv-badge warn" id="chatBusyChip" hidden>✍ Наставник отвечает…</span>
           <span class="right" style="display:flex;gap:8px">
             <button class="btn btn-ghost" id="chatJournalBtn" title="Наставник обновит журнал по итогам переписки">Обновить журнал</button>
           </span>
@@ -1188,15 +1266,21 @@
             фото макета
             <button type="button" id="chatAttDel" class="t-imgdel" aria-label="Убрать фото">✕</button>
           </span>
+          <span id="chatFileChips"></span>
           <span id="chatGhChips"></span>
         </div>
         <div class="chat-inputrow">
           <input type="file" id="chatFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+          <input type="file" id="chatTextFiles" multiple hidden>
+          <input type="file" id="chatFolder" webkitdirectory hidden>
           <button class="iconbtn chat-attach" id="chatAttachBtn" title="Прикрепить фото макета (или Ctrl+V)" aria-label="Прикрепить фото макета">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
           </button>
           <button class="iconbtn chat-github" id="chatGhBtn" title="Прикрепить файлы из GitHub" aria-label="Прикрепить файлы из GitHub">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+          </button>
+          <button class="iconbtn chat-github" id="chatFilesBtn" title="Прикрепить файл или папку с компьютера (код, текст)" aria-label="Прикрепить файлы с компьютера">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
           </button>
           <textarea id="chatInput" class="chat-inp" rows="1" placeholder="Напиши наставнику…" title="Enter — отправить, Shift+Enter — новая строка"></textarea>
           <button class="chat-send" id="chatSendBtn" title="Отправить (Enter)" aria-label="Отправить">
@@ -1248,17 +1332,21 @@
       </div>
     </div>
     <div class="card">
-      <textarea id="njournalText" class="m-area" rows="20" spellcheck="false" placeholder="Журнала пока нет. Проведи первую сессию с наставником и нажми «Обновить через наставника» — он составит стартовый журнал.&#10;&#10;Или заполни вручную."></textarea>
+      <div class="nj-view" id="njournalView"></div>
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;color:var(--muted);font-size:13px">✏️ Редактировать текстом</summary>
+        <textarea id="njournalText" class="m-area" rows="20" spellcheck="false" style="margin-top:10px" placeholder="Журнала пока нет. Проведи первую сессию с наставником и нажми «Обновить через наставника» — он составит стартовый журнал.&#10;&#10;Или заполни вручную."></textarea>
+      </details>
       <p class="mv-hint" id="njournalUpdated"></p>
     </div>
     <div class="card">
       <details>
         <summary style="cursor:pointer;color:var(--muted);font-size:13px">🧠 Заметки «запомни» · notes/notes.md</summary>
-        <pre id="njournalNotes" class="m-pre" style="margin-top:8px"></pre>
+        <div id="njournalNotes" class="nj-md" style="margin-top:8px"></div>
       </details>
       <details style="margin-top:10px">
         <summary style="cursor:pointer;color:var(--muted);font-size:13px">🖼 Последний разбор макета · layouts/last_review.md</summary>
-        <pre id="njournalLayout" class="m-pre" style="margin-top:8px"></pre>
+        <div id="njournalLayout" class="nj-md" style="margin-top:8px"></div>
       </details>
     </div>
   </section>
@@ -1629,7 +1717,7 @@
   </section>
 </main>
 
-<footer>Наставник по фронтенду · AI-команда на бесплатных моделях OpenRouter · память — папка CodeTimeMentor на вашем ПК · <span id="footVersion">v2.4.3</span> CodeTime</footer>
+<footer>Наставник по фронтенду · AI-команда на бесплатных моделях OpenRouter · память — папка CodeTimeMentor на вашем ПК · <span id="footVersion">v2.5.0</span> CodeTime</footer>
 
   </div><!-- /app-col -->
 </div><!-- /app -->
@@ -1765,8 +1853,15 @@ function $(id) { return document.getElementById(id); }
 
 function api(path) {
   return fetch(path).then(function (r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+    // v2.5.0: читаем тело ошибки — сервер присылает человеческий текст
+    // в {"error": …} (раньше модалки показывали голое «HTTP 400»)
+    return r.json().then(function (data) {
+      if (!r.ok) throw new Error((data && data.error) || ('HTTP ' + r.status));
+      return data;
+    }, function () {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return {};
+    });
   }).catch(function (err) {
     // v2.4.1: демо-данными отвечаем ТОЛЬКО если демо уже включено
     // (статический предпросмотр). Разовый сбой GET больше не выключает
@@ -1779,16 +1874,20 @@ function api(path) {
   });
 }
 
-function apiPost(path, body) {
+function apiPost(path, body, signal) {
   if (DEMO) return demoPost(path, body);
   return fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body || {})
+    body: JSON.stringify(body || {}),
+    signal: signal || undefined
   }).then(function (r) {
     return r.json().then(function (data) {
       if (!r.ok) throw new Error((data && data.error) || ('HTTP ' + r.status));
       return data;
+    }, function () {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return {};
     });
   });
 }
@@ -2305,16 +2404,16 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: '',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '2.4.3' };
+             version: '2.5.0' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '2.4.3', latest: '2.4.3',
-             tagName: 'v2.4.3', available: false,
+    return { configured: true, current: '2.5.0', latest: '2.5.0',
+             tagName: 'v2.5.0', available: false,
              assetName: 'CodeTime.exe', assetSize: 22048000,
              releaseUrl: '#', notes: 'Боты починены: ваш ключ OpenRouter теперь обслуживает и чат, и команду; мёртвый встроенный ключ Gemini удалён — только ваши ключи; фолбэки моделей в чате; в релизе лежит архив исходников для обновления локальной папки' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '2.4.3', releases: demoReleases() };
+    return { configured: true, current: '2.5.0', releases: demoReleases() };
   }
   return undefined;
 }
@@ -3715,9 +3814,12 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
+    { tag: 'v2.5.0', version: '2.5.0', date: '2026-10-06', assetSize: 22100000,
+      notes: 'Оформление ответов ботов как в эталоне: отступы, нумерация не сбивается, пути файлов [styles/app.css] — синими бейджами, команды — зелёным кодом; контент шире (1340px) и чат шире; чат больше не «пустеет» при переключении вкладок и не зависает навсегда (таймаут 3 мин); файлы с компьютера и из папки можно кидать наставнику прямо в чат; вежливая ошибка вместо «HTTP 400» в выборе файлов GitHub; План обучения — месяцами с подразделами; Журнал свёрстан; левое меню и панель чатов сворачиваются; память чатов связана — наставник помнит другие чаты.',
+      relation: 'current' },
     { tag: 'v2.4.3', version: '2.4.3', date: '2026-10-05', assetSize: 22100000,
       notes: 'Боты починены: ключ OpenRouter теперь обслуживает и личный чат, и ИИ-команду; мёртвый встроенный ключ Gemini удалён — приложение работает только на ваших ключах; фолбэки моделей в чате; актуальные модели Gemini для «Своего ключа»; в релизе лежит архив исходников — обновите им свою локальную папку.',
-      relation: 'current' },
+      relation: 'older' },
     { tag: 'v2.4.0', version: '2.4.0', date: '2026-10-06', assetSize: 22092000,
       notes: 'Новый дизайн в стиле эталона: боковой сайдбар с разделами (Команда · Чат · План · Журнал · Настройки · CodeTime), топбар с заголовком, аватар и имя наставника у каждого ответа в чате, приветствие с аватаром; мобильная версия — сайдбар по бургеру. Все функции прежние: AI-команда на бесплатных моделях, чат с памятью, план с чекбоксами, журнал, трекер времени.',
       relation: 'older' },
@@ -3928,6 +4030,20 @@ function hlCode(src, lang) {
 }
 
 // ---------- мини-разметка v3: настоящие блоки, как в референсе ----------
+// путь файла (styles/product.css, src/App.jsx, package.json) — синий бейдж
+var MD_PATH_RE = /^[A-Za-z0-9._@-]+(?:\/[A-Za-z0-9._@-]+)+$/;
+
+function mdPathBadge(s) {
+  // 1) пути в бэктигах: `styles/main.css`
+  s = s.replace(/<code>([^<]+)<\/code>/g, function (m, c) {
+    return MD_PATH_RE.test(c) ? '<code class="md-path">' + c + '</code>' : m;
+  });
+  // 2) пути в квадратных скобках: [styles/product.css] — как пишут модели
+  s = s.replace(/\[([A-Za-z0-9._@-]+(?:\/[A-Za-z0-9._@-]+)+)\]/g,
+    function (m, c) { return '<code class="md-path">' + c + '</code>'; });
+  return s;
+}
+
 function mdInline(s) {
   s = s.replace(/`([^`]+)`/g, function (_, c) { return '<code>' + c + '</code>'; });
   s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<b><i>$1</i></b>');
@@ -3936,6 +4052,8 @@ function mdInline(s) {
   s = s.replace(/~~([^~\n]+)~~/g, '<s>$1</s>');
   s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  // бейджи путей — после ссылок, чтобы не ломать [текст](url)
+  s = mdPathBadge(s);
   return s;
 }
 
@@ -4065,6 +4183,13 @@ function mdRender(src) {
         } else if (items.length && /^\s{2,}\S/.test(lines[i])) {
           items[items.length - 1].text += '\n' + lines[i].trim();   // продолжение пункта
           i++;
+        } else if (items.length && lines[i].trim() === '') {
+          // v2.5.0: пустая строка между пунктами не рвёт нумерацию
+          // (иначе «2.» после абзаца рендерился как «1.» в новом <ol>)
+          var j2 = i;
+          while (j2 < lines.length && lines[j2].trim() === '') j2++;
+          if (j2 < lines.length && MD_LIST_RE.test(lines[j2])) { i = j2; continue; }
+          break;
         } else {
           break;
         }
@@ -4132,6 +4257,7 @@ var NM = {
   // чат
   chats: [], chatId: null, msgs: [], chatBusy: false,
   chatAttach: null,     // {imagePath, preview}
+  localFiles: [],       // v2.5.0: файлы/папки с компьютера [{file,name,size,content,truncated}]
   ghSel: [], ghLoaded: false,
   expanded: {},
   // команда
@@ -4375,7 +4501,13 @@ function mentorUploadImage(file, cb) {
 // ================= ЧАТ =================
 
 function chatInit() {
-  if (NM.chatInited) return;
+  if (NM.chatInited) {
+    // v2.5.0: возврат на вкладку — всегда перерисовываем ленту из состояния,
+    // чтобы не оставался висеть «Загружаю чат…» или пустой экран
+    chatRenderMsgs();
+    if (NM.chatBusy) chatShowTyping();   // ответ ещё ждём — возвращаем индикатор
+    return;
+  }
   NM.chatInited = true;
   chatRefreshList().then(function (list) {
     if (!list.length) {
@@ -4498,6 +4630,16 @@ function chatRenderMsgs() {
   box.scrollTop = box.scrollHeight;
 }
 
+// индикатор «наставник думает» (v2.5.0: вынесен — восстановление при возврате на вкладку)
+function chatShowTyping() {
+  var box = document.getElementById('chatMsgs');
+  if (!box || document.getElementById('chatTyping')) return;
+  box.insertAdjacentHTML('beforeend',
+    '<div class="c-row" id="chatTyping"><div class="c-bub b m-msg bot m-typing">Наставник думает' +
+    '<span class="m-typing-dots"><i></i><i></i><i></i></span></div></div>');
+  box.scrollTop = box.scrollHeight;
+}
+
 function chatSend() {
   if (NM.chatBusy) return;
   // v2.4.1: если чат ещё не создан/не открыт — создаём и отправляем в него,
@@ -4519,9 +4661,15 @@ function chatSendDo() {
   var inp = document.getElementById('chatInput');
   var text = inp.value.trim();
   var gh = NM.ghSel.slice();
-  if (!text && !NM.chatAttach && !gh.length) return;
+  var lf = (NM.localFiles || []).filter(function (x) { return x.content !== undefined; })
+    .map(function (x) { return { name: x.name, content: x.content,
+                                 truncated: !!x.truncated }; });
+  if (!text && !NM.chatAttach && !gh.length && !lf.length) return;
   var preview = NM.chatAttach ? NM.chatAttach.preview : '';
-  var local = { id: 'tmp', role: 'user', content: text || '(без текста)',
+  var pendingText = text || (lf.length
+    ? '📎 файлы: ' + lf.map(function (x) { return x.name.split('/').pop(); }).join(', ')
+    : '(без текста)');
+  var local = { id: 'tmp', role: 'user', content: pendingText,
                 imagePath: preview, pending: true };
   NM.msgs.push(local);
   chatRenderMsgs();
@@ -4529,23 +4677,26 @@ function chatSendDo() {
   inp.style.height = 'auto';
   NM.chatBusy = true;
   document.getElementById('chatSendBtn').disabled = true;
+  var busyChip = document.getElementById('chatBusyChip');
+  if (busyChip) busyChip.hidden = false;
   var chatIdAtSend = NM.chatId;   // v2.4.2: изоляция чата при переключении
   var hadImg = NM.chatAttach;
   NM.chatAttach = null;
   NM.ghSel = [];
+  NM.localFiles = [];
   chatRenderAttachRow();
-  // индикатор «думает»
-  var box = document.getElementById('chatMsgs');
-  box.insertAdjacentHTML('beforeend',
-    '<div class="c-row" id="chatTyping"><div class="c-bub b m-msg bot m-typing">Наставник думает' +
-    '<span class="m-typing-dots"><i></i><i></i><i></i></span></div></div>');
-  box.scrollTop = box.scrollHeight;
+  chatShowTyping();
+  // v2.5.0: таймаут 3 минуты — ввод больше не блокируется навсегда,
+  // если модель зависла; и не теряем запрос при уходе на другую вкладку
+  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 180000);
   apiPost('/api/mentor/send', {
     chatId: NM.chatId,
     content: text,
     imagePath: hadImg ? hadImg.imagePath : '',
-    githubPaths: gh
-  }).then(function (d) {
+    githubPaths: gh,
+    files: lf
+  }, ctrl ? ctrl.signal : undefined).then(function (d) {
     NM.msgs = NM.msgs.filter(function (m) { return m !== local; });
     // v2.4.2: пока ждали ответ, пользователь мог открыть другой чат —
     // не подмешиваем чужой ответ в его ленту (бэк уже сохранил куда надо)
@@ -4566,17 +4717,22 @@ function chatSendDo() {
     if (d.planSaved) showToast('🗺 План обновлён');
   }).catch(function (e) {
     NM.msgs = NM.msgs.filter(function (m) { return m !== local; });
+    var msg = (e && (e.name === 'AbortError' || /aborted/i.test(String(e.message))))
+      ? 'Наставник не ответил за 3 минуты — модель перегружена. Попробуй ещё раз.'
+      : e.message;
     if (NM.chatId === chatIdAtSend) {
       chatRenderMsgs();
       box.insertAdjacentHTML('beforeend',
-        '<div class="c-row"><div class="c-bub b err">' + esc(e.message) + '</div></div>');
+        '<div class="c-row"><div class="c-bub b err">' + esc(msg) + '</div></div>');
       box.scrollTop = box.scrollHeight;
     } else {
-      showToast('Ошибка отправки: ' + e.message);
+      showToast('Ошибка отправки: ' + msg);
     }
   }).finally(function () {
+    clearTimeout(timer);
     NM.chatBusy = false;
     document.getElementById('chatSendBtn').disabled = false;
+    if (busyChip) busyChip.hidden = true;
     var t = document.getElementById('chatTyping');
     if (t) t.remove();
   });
@@ -4584,15 +4740,55 @@ function chatSendDo() {
 
 function chatRenderAttachRow() {
   var row = document.getElementById('chatAttachRow');
-  var has = !!NM.chatAttach || NM.ghSel.length > 0;
+  var has = !!NM.chatAttach || NM.ghSel.length > 0 || (NM.localFiles || []).length > 0;
   row.hidden = !has;
   if (NM.chatAttach) {
     document.getElementById('chatAttThumb').src = NM.chatAttach.preview;
   }
+  document.getElementById('chatFileChips').innerHTML = (NM.localFiles || []).map(function (x, i) {
+    return '<span class="gh-chip">📄 ' + esc(x.name.split('/').pop()) +
+      '<button type="button" class="t-imgdel" data-lfdel="' + i + '" aria-label="Убрать файл">✕</button></span>';
+  }).join('');
   document.getElementById('chatGhChips').innerHTML = NM.ghSel.map(function (p) {
     return '<span class="gh-chip">📄 ' + esc(p.split('/').pop()) +
       '<button type="button" class="t-imgdel" data-ghdel="' + esc(p) + '" aria-label="Убрать файл">✕</button></span>';
   }).join('');
+}
+
+// ---------- v2.5.0: локальные файлы/папки от студента ----------
+var LOCAL_TEXT_EXT = /\.(txt|md|markdown|js|jsx|ts|tsx|mjs|cjs|css|scss|sass|less|html|htm|vue|svelte|json|py|rb|php|java|kt|swift|c|h|cpp|hpp|cs|go|rs|xml|svg|yml|yaml|toml|ini|env|cfg|conf|sh|bat|ps1|sql|csv|tsv|gitignore|gitattributes|editorconfig|lock)$/i;
+
+function localFilesAdd(fileList) {
+  var files = Array.prototype.slice.call(fileList || []);
+  var skipped = [];
+  files.forEach(function (f) {
+    var rel = f.webkitRelativePath || f.name;
+    if ((NM.localFiles || []).length >= 6) { skipped.push(rel + ' — лимит 6 файлов'); return; }
+    if (f.size > 1024 * 1024) { skipped.push(rel + ' — больше 1 МБ'); return; }
+    if (!LOCAL_TEXT_EXT.test(f.name)) { skipped.push(rel + ' — не текстовый'); return; }
+    if (NM.localFiles.some(function (x) { return x.name === rel; })) return;
+    NM.localFiles.push({ file: f, name: rel, size: f.size });
+  });
+  chatRenderAttachRow();
+  // читаем содержимое (асинхронно, чипы обновятся)
+  (NM.localFiles || []).forEach(function (x) {
+    if (x.content !== undefined) return;
+    var r = new FileReader();
+    r.onload = function () {
+      x.content = String(r.result);
+      if (x.content.length > 200000) {
+        x.content = x.content.slice(0, 200000);
+        x.truncated = true;
+      }
+      chatRenderAttachRow();
+    };
+    r.onerror = function () {
+      NM.localFiles = NM.localFiles.filter(function (y) { return y !== x; });
+      chatRenderAttachRow();
+    };
+    r.readAsText(x.file);
+  });
+  if (skipped.length) showToast('Пропущены: ' + skipped.slice(0, 3).join('; '));
 }
 
 // кнопки чата
@@ -4620,6 +4816,26 @@ document.getElementById('chatAttDel').addEventListener('click', function () {
   NM.chatAttach = null;
   chatRenderAttachRow();
 });
+// v2.5.0: локальные файлы и папки
+function localFilesDel(i) {
+  NM.localFiles.splice(i, 1);
+  chatRenderAttachRow();
+}
+document.getElementById('chatFilesBtn').addEventListener('click', function () {
+  document.getElementById('chatTextFiles').click();
+});
+document.getElementById('chatTextFiles').addEventListener('change', function () {
+  localFilesAdd(this.files);
+  this.value = '';
+});
+document.getElementById('chatFolder').addEventListener('change', function () {
+  localFilesAdd(this.files);
+  this.value = '';
+});
+document.getElementById('chatFileChips').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-lfdel]');
+  if (b) localFilesDel(parseInt(b.dataset.lfdel, 10));
+});
 document.getElementById('chatList').addEventListener('click', function (e) {
   var del = e.target.closest('[data-del]');
   if (del) { e.stopPropagation(); chatDelete(del.dataset.del); return; }
@@ -4633,9 +4849,30 @@ document.getElementById('chatGhChips').addEventListener('click', function (e) {
     chatRenderAttachRow();
   }
 });
+// v2.5.0: ☰ — на десктопе сворачивает панель чатов (чат шире), на мобиле открывает список
 document.getElementById('chatBurger').addEventListener('click', function () {
-  document.getElementById('chatSide').classList.toggle('open');
+  var side = document.getElementById('chatSide');
+  if (window.innerWidth <= 900) { side.classList.toggle('open'); return; }
+  var min = side.classList.toggle('min');
+  try { localStorage.setItem('ctChatSideMin', min ? '1' : '0'); } catch (e) {}
 });
+try {
+  if (localStorage.getItem('ctChatSideMin') === '1' && window.innerWidth > 900)
+    document.getElementById('chatSide').classList.add('min');
+} catch (e) {}
+// v2.5.0: сворачивание левого меню приложения до иконок
+(function () {
+  var btn = document.getElementById('sideCollapse');
+  if (!btn) return;
+  function apply(on) {
+    document.body.classList.toggle('side-min', on);
+    try { localStorage.setItem('ctSideMin', on ? '1' : '0'); } catch (e) {}
+  }
+  btn.addEventListener('click', function () {
+    apply(!document.body.classList.contains('side-min'));
+  });
+  try { if (localStorage.getItem('ctSideMin') === '1') apply(true); } catch (e) {}
+})();
 document.getElementById('chatMsgs').addEventListener('click', function (e) {
   var cp = e.target.closest('[data-copy]');
   if (cp) {
@@ -4708,8 +4945,12 @@ function ghRender() {
     return;
   }
   if (GH.error) {
-    box.innerHTML = '<div class="muted-lbl" style="padding:16px;color:var(--red)">' + esc(GH.error) +
-      ' <button class="gh-back" id="ghGoSettings">Настройки GitHub</button></div>';
+    var noRepo = /не подключ/i.test(GH.error);
+    box.innerHTML = '<div class="gh-err"><div class="gh-err-ico" aria-hidden="true">' +
+      (noRepo ? '🔌' : '⚠️') + '</div><b>' + esc(GH.error) + '</b>' +
+      '<p class="muted-lbl">Файлы берутся из твоего GitHub-репозитория. Подключи его в ' +
+      'Настройках: токен с правом «Contents: Read» и адрес «owner/имя» — и выбирай файлы отсюда.</p>' +
+      '<button class="btn" id="ghGoSettings" style="padding:8px 16px">Открыть настройки GitHub</button></div>';
     var g = document.getElementById('ghGoSettings');
     if (g) g.addEventListener('click', function () {
       document.getElementById('ghModal').hidden = true;
@@ -4784,16 +5025,43 @@ function renderNPlan() {
   document.getElementById('nplanBar').style.width =
     (items.length ? Math.round(done * 100 / items.length) : 0) + '%';
   document.getElementById('nplanRaw').value = NM.planRaw;
-  document.getElementById('nplanList').innerHTML = items.length ? items.map(function (it) {
-    return '<div class="nplan-item' + (it.done ? ' done' : '') + '">' +
-      '<input type="checkbox" data-pid="' + it.id + '"' + (it.done ? ' checked' : '') +
-      ' aria-label="Отметить выполненным">' +
-      '<div><div class="np-head">' +
-      (it.period ? '<span class="chip">' + esc(it.period) + '</span>' : '') +
-      '<span class="np-goal">' + esc(it.goal) + '</span></div>' +
-      (it.details ? '<p class="np-det">' + esc(it.details) + '</p>' : '') +
-      '</div></div>';
-  }).join('') : '<div class="card"><p class="muted-lbl">План пуст — нажми «Составить через наставника».</p></div>';
+  if (!items.length) {
+    document.getElementById('nplanList').innerHTML =
+      '<div class="card"><p class="muted-lbl">План пуст — нажми «Составить через наставника».</p></div>';
+    return;
+  }
+  // v2.5.0: группировка Месяц → Модуль → Задачи (плоские старые планы тоже работают)
+  var months = [];
+  items.forEach(function (it) {
+    var mk = it.period || 'Без срока';
+    var mo = months.find(function (m) { return m.key === mk; });
+    if (!mo) { mo = { key: mk, modules: [] }; months.push(mo); }
+    var md = it.module || '';
+    var mm = mo.modules.find(function (x) { return x.key === md; });
+    if (!mm) { mm = { key: md, tasks: [] }; mo.modules.push(mm); }
+    mm.tasks.push(it);
+  });
+  document.getElementById('nplanList').innerHTML = months.map(function (mo) {
+    var mDone = mo.modules.reduce(function (n, mm) {
+      return n + mm.tasks.filter(function (t) { return t.done; }).length; }, 0);
+    var mAll = mo.modules.reduce(function (n, mm) { return n + mm.tasks.length; }, 0);
+    return '<div class="np-month"><h4>' + esc(mo.key) +
+      '<span class="chip">' + mDone + ' / ' + mAll + '</span></h4>' +
+      mo.modules.map(function (mm) {
+        return '<div class="np-mod">' +
+          (mm.key ? '<b>' + esc(mm.key) + '</b>' : '') +
+          mm.tasks.map(function (it) {
+            return '<div class="nplan-item' + (it.done ? ' done' : '') + '">' +
+              '<input type="checkbox" data-pid="' + it.id + '"' + (it.done ? ' checked' : '') +
+              ' aria-label="Отметить выполненным">' +
+              '<div><div class="np-head">' +
+              (it.period && !mm.key ? '<span class="chip">' + esc(it.period) + '</span>' : '') +
+              '<span class="np-goal">' + esc(it.goal) + '</span></div>' +
+              (it.details ? '<p class="np-det">' + esc(it.details) + '</p>' : '') +
+              '</div></div>';
+          }).join('') + '</div>';
+      }).join('') + '</div>';
+  }).join('');
 }
 
 document.getElementById('nplanList').addEventListener('change', function (e) {
@@ -4846,8 +5114,13 @@ document.getElementById('nplanRawSave').addEventListener('click', function () {
 function loadNJournal() {
   api('/api/mentor/journal').then(function (d) {
     document.getElementById('njournalText').value = d.content || '';
-    document.getElementById('njournalNotes').textContent = d.notes || '(пусто)';
-    document.getElementById('njournalLayout').textContent = d.layoutReview || '(пусто)';
+    // v2.5.0: журнал, заметки и разбор макета — свёрстанные, а не простыня текста
+    document.getElementById('njournalView').innerHTML =
+      (d.content || '').trim() ? mdRender(d.content) : '';
+    document.getElementById('njournalNotes').innerHTML =
+      (d.notes || '').trim() ? mdRender(d.notes) : '<p class="muted-lbl">Пока пусто. Скажи наставнику «запомни …» — заметка появится здесь.</p>';
+    document.getElementById('njournalLayout').innerHTML =
+      (d.layoutReview || '').trim() ? mdRender(d.layoutReview) : '<p class="muted-lbl">Макеты ещё не разбирали.</p>';
     document.getElementById('njournalUpdated').textContent = d.updatedAt
       ? 'Обновлён: ' + String(d.updatedAt).replace('T', ' ').slice(0, 16) + ' · папка: ' + (d.folder || '')
       : 'Ещё не заполнялся · папка: ' + (d.folder || '');

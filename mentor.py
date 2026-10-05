@@ -1699,16 +1699,66 @@ def _clip(s, mx=MAX_MSG_CHARS):
     return s[:mx] + '\n…(обрезано)' if len(s) > mx else s
 
 
+def _other_chats_digest(current_id, deep=False):
+    """v2.5.0: память о ДРУГИХ чатах — наставник помнит, что обсуждалось
+    в соседних сессиях. deep=True — вытащить и последние реплики."""
+    out = []
+    try:
+        idx = _chats_index()
+    except Exception:
+        return out
+    for c in idx:
+        if c.get('id') == current_id:
+            continue
+        msgs = _chat_messages(c.get('id'))
+        if not msgs:
+            continue
+        first_user = next((m.get('content') for m in msgs
+                           if m.get('role') == 'user'), '')
+        entry = {'title': c.get('title') or 'Новый чат',
+                 'updated': str(c.get('updatedAt') or '')[:10],
+                 'count': len(msgs),
+                 'topic': _clip(str(first_user or ''), 200)}
+        if deep:
+            convo = []
+            for m in msgs[-8:]:
+                who = 'Ученик' if m.get('role') == 'user' else 'Наставник'
+                convo.append('%s: %s' % (who, _clip(str(m.get('content') or ''), 400)))
+            entry['recent'] = '\n'.join(convo)
+        out.append(entry)
+        if len(out) >= 12:
+            break
+    return out
+
+
+_RECALL_RE = re.compile(
+    r'вспомни|другом чат|другой чат|других чат|прошлых чат|в прошлый раз|'
+    r'раньше делали|мы уже делал|что мы делал', re.IGNORECASE)
+
+
 def api_send(data):
-    """Отправка сообщения в чат: фото → Зрение, файлы GitHub, история,
-    [НУЖЕН ФАЙЛ] автоподтягивание. Ответ наставника с подписью модели."""
+    """Отправка сообщения в чат: фото → Зрение, файлы GitHub ИЛИ с компьютера,
+    история, память о других чатах, [НУЖЕН ФАЙЛ] автоподтягивание.
+    Ответ наставника с подписью модели."""
     chat_id = str(data.get('chatId') or '')
     text = (data.get('content') or '').strip()
     image_path = str(data.get('imagePath') or '')
     gh_paths = [str(p) for p in (data.get('githubPaths') or []) if p][:6]
+    # v2.5.0: файлы/папка с компьютера (текст, прочитан на фронте)
+    files_clean = []
+    if isinstance(data.get('files'), list):
+        for f in data['files'][:6]:
+            if not isinstance(f, dict):
+                continue
+            fname = str(f.get('name') or 'файл')[:120]
+            fcontent = str(f.get('content') or '')[:30000]
+            if not fcontent:
+                continue
+            files_clean.append({'name': fname, 'content': fcontent,
+                                'truncated': bool(f.get('truncated'))})
     if not chat_id:
         raise MentorError('Не указан чат.')
-    if not text and not image_path and not gh_paths:
+    if not text and not image_path and not gh_paths and not files_clean:
         raise MentorError('Пустое сообщение.')
     idx = _chats_index()
     meta = next((c for c in idx if c['id'] == chat_id), None)
@@ -1770,9 +1820,14 @@ def api_send(data):
     # 3. Сообщение ученика
     now = datetime.now().isoformat(timespec='seconds')
     user_msg = {'id': 'm' + str(int(time.time() * 1000)), 'role': 'user',
-                'content': text or '(без текста)',
+                'content': text or ('📎 файлы: ' +
+                                    ', '.join(os.path.basename(f['name'])
+                                              for f in files_clean)
+                                    if files_clean else '(без текста)'),
                 'imagePath': ('layouts/' + image_path) if image_path else '',
-                'imageNote': image_note, 'createdAt': now}
+                'imageNote': image_note, 'createdAt': now,
+                'files': [{'name': f['name'], 'chars': len(f['content'])}
+                          for f in files_clean]}
     msgs = _chat_messages(chat_id)
     msgs.append(user_msg)
 
@@ -1782,6 +1837,22 @@ def api_send(data):
 
     # 4. Системный промпт: роль + журнал + план + репозиторий + среда
     system = build_system_prompt(cfg, 'free')
+    # v2.5.0: память о других чатах — всегда краткая, по запросу «вспомни…» — подробная
+    deep_memory = bool(text and _RECALL_RE.search(text))
+    digest = _other_chats_digest(chat_id, deep=deep_memory)
+    if digest:
+        parts = []
+        for e in digest:
+            line = ('- «%s» (%s, %d сообщ.): %s'
+                    % (e['title'], e['updated'], e['count'], e['topic']))
+            if e.get('recent'):
+                line += '\n  Последнее из этого чата:\n  ' + \
+                    e['recent'].replace('\n', '\n  ')
+            parts.append(line)
+        system += ('\n\n# ПАМЯТЬ О ДРУГИХ ЧАТАХ (что студент обсуждал с тобой '
+                   'в других сессиях)\nИспользуй как контекст: студент ведёт '
+                   'несколько параллельных чатов, не делай вид, что не в курсе.\n'
+                   + '\n'.join(parts))
     system += '\n\n' + ENV_RULES
     system += '\n\n# СЕГОДНЯ\n' + \
         datetime.now().strftime('%d %B %Y (%A), %H:%M')
@@ -1798,6 +1869,12 @@ def api_send(data):
         if m is user_msg and attached:
             c += '\n\n[Файлы из GitHub, приложенные учеником]\n' + \
                 files_to_blocks(attached)
+        if m is user_msg and files_clean:
+            c += '\n\n[Файлы с компьютера ученика]\n' + '\n\n'.join(
+                '--- %s ---\n```\n%s\n```%s'
+                % (f['name'], f['content'],
+                   '\n(файл обрезан по размеру)' if f.get('truncated') else '')
+                for f in files_clean)
         llm_messages.append({'role': 'assistant' if m['role'] == 'assistant'
                              else 'user', 'content': _clip(c)})
 
@@ -2226,20 +2303,38 @@ _PLAN_PERIOD_RE = re.compile(r'^([А-ЯЁA-Z][а-яёa-z]+(?:\s*\d{4})?)\s*[—:
 
 
 def _plan_items_from_md(md_text):
-    """Парсит план.md в пункты {id: №строки, period, goal, done}."""
+    """Парсит plan.md в пункты {id: №строки, period, module, goal, details, done}.
+    v2.5.0: понимает заголовки «## Месяц» и «### Модуль» + строки-пояснения
+    с отступом. Старый плоский формат («- [ ] Месяц — цель») тоже работает."""
     items = []
+    period, module = '', ''
     for i, line in enumerate((md_text or '').split('\n')):
-        m = re.match(r'^\s*-\s*\[([ xX])\]\s*(.*)$', line)
-        if not m:
+        hm = re.match(r'^\s*##\s+(?!#)(.+)$', line)
+        if hm:
+            period, module = hm.group(1).strip(), ''
             continue
-        done = m.group(1).lower() == 'x'
-        rest = m.group(2).strip()
-        pm = _PLAN_PERIOD_RE.match(rest)
-        if pm and len(pm.group(1)) <= 20:
-            period, goal = pm.group(1).strip(), pm.group(2).strip()
-        else:
-            period, goal = '', rest
-        items.append({'id': i, 'period': period, 'goal': goal, 'done': done})
+        hm3 = re.match(r'^\s*###\s+(.+)$', line)
+        if hm3:
+            module = hm3.group(1).strip()
+            continue
+        m = re.match(r'^\s*-\s*\[([ xX])\]\s*(.*)$', line)
+        if m:
+            done = m.group(1).lower() == 'x'
+            rest = m.group(2).strip()
+            pm = _PLAN_PERIOD_RE.match(rest)
+            if pm and len(pm.group(1)) <= 20:
+                goal = pm.group(2).strip()
+                period2 = '' if period else pm.group(1).strip()
+            else:
+                period2, goal = '', rest
+            items.append({'id': i, 'period': period or period2, 'module': module,
+                          'goal': goal, 'details': '', 'done': done})
+            continue
+        # пояснение к предыдущей задаче (строка с отступом, не чекбокс/заголовок)
+        if (items and line.strip() and not line.lstrip().startswith('#')
+                and re.match(r'^\s{2,}\S', line)):
+            items[-1]['details'] = (items[-1]['details'] + ' ' +
+                                    line.strip()).strip()[:500]
     return items
 
 
@@ -2271,9 +2366,11 @@ def api_plan_patch(data):
 
 PLAN_AI_INSTRUCTION = """Обнови план обучения ученика (вкладка «План» в интерфейсе). Опирайся на роль, прежний план, журнал и сегодняшнюю дату: сдвинь этапы так, чтобы цель «Junior/Middle к апрелю 2027» была реалистичной с учётом того, что уже сделано.
 
-Верни СТРОГО JSON-массив без пояснений и без markdown-обёртки, каждый элемент:
-[{"period": "Месяц ГГГГ", "goal": "цель одной фразой", "details": "1-2 предложения: что конкретно делаем"}, ...]
-Периоды — с текущего месяца по апрель 2027 включительно (уже пройденное не включай). От 4 до 10 пунктов. Только JSON."""
+Структура плана: разделы-месяцы, внутри каждого месяца 2–4 подраздела (модуля), внутри модуля 2–4 конкретные задачи с чекбоксами.
+
+Верни СТРОГО JSON-массив без пояснений и без markdown-обёртки. Каждый элемент — ОДНА задача:
+{"period": "Месяц ГГГГ", "module": "название подраздела", "goal": "задача одной фразой", "details": "1-2 предложения: как именно делаем"}
+Правила: периоды — с текущего месяца по апрель 2027 включительно (уже пройденное не включай); в каждом месяце 2–4 разных module (для задач одного подраздела повторяй тот же module); в каждом module 2–4 задачи; задачи конкретные и проверяемые. Только JSON."""
 
 
 def api_plan_ai():
@@ -2305,15 +2402,24 @@ def api_plan_ai():
     if not isinstance(arr, list) or not arr:
         raise MentorError('Пустой план от наставника.')
     lines = ['# План обучения — Junior/Middle к апрелю 2027', '']
-    for it in arr[:12]:
+    cur_period = cur_module = None
+    for it in arr[:48]:
         if not isinstance(it, dict):
             continue
         period = str(it.get('period') or '').strip()[:60]
+        module = str(it.get('module') or '').strip()[:80]
         goal = str(it.get('goal') or '').strip()[:300]
         details = str(it.get('details') or '').strip()[:2000]
         if not goal:
             continue
-        lines.append('- [ ] %s%s' % ((period + ' — ') if period else '', goal))
+        # v2.5.0: структура Месяц → Модуль → задачи (чекбоксы кликабельны)
+        if period and period != cur_period:
+            lines += ['', '## %s' % period]
+            cur_period, cur_module = period, None
+        if module and module != cur_module:
+            lines += ['', '### %s' % module]
+            cur_module = module
+        lines.append('- [ ] %s' % goal)
         if details:
             lines.append('  %s' % details)
     lines.append('')
