@@ -992,12 +992,21 @@
   }
   .chat-item:hover .ci-del { opacity: 1; }
   .chat-item .ci-del:hover { color: var(--red); }
+  .chat-item .ci-bot { font-style: normal; font-size: 11px; }
   .chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .chat-top {
     display: flex; align-items: center; gap: 10px; padding: 10px 16px;
     border-bottom: 1px solid var(--border); flex: none;
   }
   .chat-title { font-size: 14px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .chat-bot-sel {
+    flex: none; font-family: inherit; font-size: 12.5px; color: var(--text);
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 6px; cursor: pointer; max-width: 150px;
+  }
+  .chat-bot-sel:focus { outline: none; border-color: rgba(16,185,129,.55); }
+  .chat-bot-sel.helper { border-color: rgba(16,185,129,.45); color: var(--green); }
+  @media (max-width: 760px) { .chat-bot-sel { max-width: 120px; font-size: 12px; } }
   .chat-burger { display: none; padding: 7px 12px; }
   @media (min-width: 901px) { .chat-burger { display: inline-flex; } }
   .chat-msgs {
@@ -1182,7 +1191,7 @@
     <div class="side-foot">
       <span class="dot" aria-hidden="true"></span>
       <span>Всё локально на ПК</span>
-      <span class="ver" id="sideVersion">v2.5.0</span>
+      <span class="ver" id="sideVersion">v2.6.0</span>
     </div>
   </aside>
 
@@ -1255,6 +1264,10 @@
           <button class="btn btn-ghost chat-burger" id="chatBurger" aria-label="Список чатов">☰</button>
           <span class="chat-title" id="chatTitle">Новый чат</span>
           <span class="mv-badge warn" id="chatBusyChip" hidden>✍ Наставник отвечает…</span>
+          <select class="chat-bot-sel" id="chatBotSel" title="Кто отвечает в этом чате: Наставник (оценки, журнал, план) или Помощник (код без ограничений)" aria-label="Бот этого чата">
+            <option value="mentor">🎓 Наставник</option>
+            <option value="helper">🛠 Помощник</option>
+          </select>
           <span class="right" style="display:flex;gap:8px">
             <button class="btn btn-ghost" id="chatJournalBtn" title="Наставник обновит журнал по итогам переписки">Обновить журнал</button>
           </span>
@@ -1717,7 +1730,7 @@
   </section>
 </main>
 
-<footer>Наставник по фронтенду · AI-команда на бесплатных моделях OpenRouter · память — папка CodeTimeMentor на вашем ПК · <span id="footVersion">v2.5.0</span> CodeTime</footer>
+<footer>Наставник по фронтенду · AI-команда на бесплатных моделях OpenRouter · память — папка CodeTimeMentor на вашем ПК · <span id="footVersion">v2.6.0</span> CodeTime</footer>
 
   </div><!-- /app-col -->
 </div><!-- /app -->
@@ -1955,7 +1968,7 @@ var DEMO_CHAT_STATE = null;
 
 function demoChats() {
   if (!DEMO_CHAT_STATE) {
-    DEMO_CHAT_STATE = [{ id: 'demo1', title: 'Разбор страницы товара',
+    DEMO_CHAT_STATE = [{ id: 'demo1', title: 'Разбор страницы товара', bot: 'mentor',
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       messages: [] }];
   }
@@ -1963,8 +1976,8 @@ function demoChats() {
 }
 
 function demoChatMeta(c) {
-  return { id: c.id, title: c.title, updatedAt: c.updatedAt,
-           messageCount: c.messages.length };
+  return { id: c.id, title: c.title, bot: c.bot || 'mentor',
+           updatedAt: c.updatedAt, messageCount: c.messages.length };
 }
 
 function demoPost(path, body) {
@@ -2009,18 +2022,36 @@ function demoPost(path, body) {
       if (di >= 0) chats.splice(di, 1);
       return Promise.resolve({ ok: true });
     }
+    // v2.6.0: переключение бота чата в демо
+    if (body.setBot) {
+      var sc = chats.find(function (c) { return c.id === body.setBot; });
+      if (sc) sc.bot = (body.bot === 'helper') ? 'helper' : 'mentor';
+      return Promise.resolve({ ok: true, bot: sc ? sc.bot : 'mentor' });
+    }
     var ncTs = new Date().toISOString();
     var nc = { id: 'demo' + Date.now(), title: 'Новый чат',
+      bot: (body.bot === 'helper') ? 'helper' : 'mentor',
       createdAt: ncTs, updatedAt: ncTs, messages: [] };
     chats.unshift(nc);
-    return Promise.resolve({ chat: { id: nc.id, title: nc.title,
+    return Promise.resolve({ chat: { id: nc.id, title: nc.title, bot: nc.bot,
       createdAt: nc.createdAt, updatedAt: nc.updatedAt, messageCount: 0 } });
   }
   if (path === '/api/mentor/upload') {
     return Promise.resolve({ imagePath: 'demo.png', size: 1000 });
   }
   if (path === '/api/mentor/send') {
-    var reply2 = '## Разбор: pages/product.html\n\n' +
+    // v2.6.0: демо-ответ зависит от бота чата
+    var helperReply = '## Как написать функцию фильтра товаров\n\n' +
+      'Держи готовое решение — фильтрует массив товаров по цене и ключевой фразе:\n\n' +
+      '```javascript\n/**\n * Фильтрует товары по цене и фразе в названии.\n * @param {Array} items — массив товаров\n * @param {{min?: number, max?: number, query?: string}} opts\n * @returns {Array} отфильтрованный массив\n */\nfunction filterItems(items, opts) {\n  const { min = 0, max = Infinity, query = \'\' } = opts || {};\n  const q = query.trim().toLowerCase();\n\n  return items.filter(function (item) {\n    const priceOk = item.price >= min && item.price <= max;\n    const nameOk = !q || String(item.name).toLowerCase().includes(q);\n    return priceOk && nameOk;\n  });\n}\n```\n\n' +
+      '**Объяснение по шагам:**\n\n' +
+      '1. Деструктуризация `opts` со значениями по умолчанию — функция не упадёт, если часть параметров не передали.\n' +
+      '2. `q` — поисковая фраза, приведённая к нижнему регистру, чтобы «Телефон» и «телефон» находились одинаково.\n' +
+      '3. `items.filter()` возвращает НОВЫЙ массив — исходный не меняется.\n' +
+      '4. Внутри проверяем два условия: цена в диапазоне и фраза в названии.\n\n' +
+      '**Пример:** `filterItems(products, { min: 1000, max: 50000, query: \'телефон\' })`\n\n' +
+      'Если нужен вариант со сортировкой по цене — скажи, добавлю.';
+    var mentorReply = '## Разбор: pages/product.html\n\n' +
       '**Вердикт:** база есть, но до Junior-уровня не дотягивает по доступности и адаптиву. Чинить по порядку.\n\n' +
       '### 1) Баги и ошибки\n\n' +
       '1. Миниатюры галереи — `<div onclick>`: клик с клавиатуры не работает, скринридер молчит.\n' +
@@ -2035,6 +2066,7 @@ function demoPost(path, body) {
     var chat = demoChats().find(function (c) { return c.id === body.chatId; });
     if (!chat) {
       chat = { id: body.chatId || ('demo' + Date.now()), title: 'Новый чат',
+        bot: 'mentor',
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         messages: [] };
       demoChats().unshift(chat);
@@ -2042,19 +2074,21 @@ function demoPost(path, body) {
     if (chat.title === 'Новый чат' && body.content) {
       chat.title = String(body.content).slice(0, 48);
     }
+    var isHelper = (chat.bot || 'mentor') === 'helper';
     var um = { id: 'u' + Date.now(), role: 'user',
       content: body.content || '(без текста)',
       imagePath: body.imagePath ? 'layouts/demo.png' : '',
-      imageNote: body.imagePath ? 'Демо: макет — страница товара, шапка, галерея слева, карточка покупки справа.' : '',
+      imageNote: (!isHelper && body.imagePath) ? 'Демо: макет — страница товара, шапка, галерея слева, карточка покупки справа.' : '',
       createdAt: new Date().toISOString() };
-    var am = { id: 'a' + Date.now(), role: 'assistant', content: reply2,
+    var am = { id: 'a' + Date.now(), role: 'assistant',
+      content: isHelper ? helperReply : mentorReply,
       model: 'демо (без ИИ)', provider: 'demo', createdAt: new Date().toISOString() };
     chat.messages.push(um, am);
     chat.updatedAt = am.createdAt;
     return Promise.resolve({
       userMessage: um, assistantMessage: am,
       noteSaved: !!(body.content && /запомни/i.test(body.content)),
-      journalSaved: false, planSaved: false });
+      journalSaved: false, planSaved: false, bot: isHelper ? 'helper' : 'mentor' });
   }
   if (path === '/api/mentor/journal') {
     return Promise.resolve({ content: body.content || '', updatedAt: new Date().toISOString(),
@@ -2375,10 +2409,11 @@ function demoData(path) {
     if (qs.id) {
       var fc = demoChats().find(function (c) { return c.id === qs.id; });
       if (fc) {
-        return { chat: { id: fc.id, title: fc.title, updatedAt: fc.updatedAt },
+        return { chat: { id: fc.id, title: fc.title, bot: fc.bot || 'mentor',
+                 updatedAt: fc.updatedAt },
                  messages: fc.messages };
       }
-      return { chat: { id: qs.id, title: 'Чат' }, messages: [] };
+      return { chat: { id: qs.id, title: 'Чат', bot: 'mentor' }, messages: [] };
     }
     var dlist = demoChats().slice().sort(function (a, b) {
       return String(b.updatedAt).localeCompare(String(a.updatedAt));
@@ -2404,16 +2439,16 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: '',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '2.5.0' };
+             version: '2.6.0' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '2.5.0', latest: '2.5.0',
-             tagName: 'v2.5.0', available: false,
+    return { configured: true, current: '2.6.0', latest: '2.6.0',
+             tagName: 'v2.6.0', available: false,
              assetName: 'CodeTime.exe', assetSize: 22048000,
              releaseUrl: '#', notes: 'Боты починены: ваш ключ OpenRouter теперь обслуживает и чат, и команду; мёртвый встроенный ключ Gemini удалён — только ваши ключи; фолбэки моделей в чате; в релизе лежит архив исходников для обновления локальной папки' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '2.5.0', releases: demoReleases() };
+    return { configured: true, current: '2.6.0', releases: demoReleases() };
   }
   return undefined;
 }
@@ -3814,8 +3849,8 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
-    { tag: 'v2.5.0', version: '2.5.0', date: '2026-10-06', assetSize: 22100000,
-      notes: 'Оформление ответов ботов как в эталоне: отступы, нумерация не сбивается, пути файлов [styles/app.css] — синими бейджами, команды — зелёным кодом; контент шире (1340px) и чат шире; чат больше не «пустеет» при переключении вкладок и не зависает навсегда (таймаут 3 мин); файлы с компьютера и из папки можно кидать наставнику прямо в чат; вежливая ошибка вместо «HTTP 400» в выборе файлов GitHub; План обучения — месяцами с подразделами; Журнал свёрстан; левое меню и панель чатов сворачиваются; память чатов связана — наставник помнит другие чаты.',
+    { tag: 'v2.6.0', version: '2.6.0', date: '2026-10-06', assetSize: 22100000,
+      notes: 'Второй бот в чате — «Помощник»: код без ограничений (готовая функция + объяснение по шагам), сам разбирает фото и файлы; переключение бота — селектором в шапке чата, история сохраняется; чаты Помощника помечены значком в списке; наставник ведёт себя как раньше; надёжнее создание чатов (исправлено редкое дублирование id).',
       relation: 'current' },
     { tag: 'v2.4.3', version: '2.4.3', date: '2026-10-05', assetSize: 22100000,
       notes: 'Боты починены: ключ OpenRouter теперь обслуживает и личный чат, и ИИ-команду; мёртвый встроенный ключ Gemini удалён — приложение работает только на ваших ключах; фолбэки моделей в чате; актуальные модели Gemini для «Своего ключа»; в релизе лежит архив исходников — обновите им свою локальную папку.',
@@ -4256,6 +4291,7 @@ var NM = {
   orSettings: null,
   // чат
   chats: [], chatId: null, msgs: [], chatBusy: false,
+  chatBot: 'mentor',    // v2.6.0: бот текущего чата — 'mentor' | 'helper'
   chatAttach: null,     // {imagePath, preview}
   localFiles: [],       // v2.5.0: файлы/папки с компьютера [{file,name,size,content,truncated}]
   ghSel: [], ghLoaded: false,
@@ -4500,6 +4536,54 @@ function mentorUploadImage(file, cb) {
 
 // ================= ЧАТ =================
 
+// v2.6.0: два бота в чате — Наставник (как был) и Помощник (код без ограничений)
+var BOTS = {
+  mentor: { name: 'Наставник', ava: '🎓', chip: 'Наставник отвечает…',
+            placeholder: 'Напиши наставнику…' },
+  helper: { name: 'Помощник', ava: '🛠', chip: 'Помощник отвечает…',
+            placeholder: 'Спроси помощника: код, объяснения, фото…' }
+};
+
+function botOf(bot) { return BOTS[bot] || BOTS.mentor; }
+
+function chatApplyBot(bot) {
+  NM.chatBot = BOTS[bot] ? bot : 'mentor';
+  var b = botOf(NM.chatBot);
+  var sel = document.getElementById('chatBotSel');
+  if (sel) {
+    sel.value = NM.chatBot;
+    sel.classList.toggle('helper', NM.chatBot === 'helper');
+  }
+  var jb = document.getElementById('chatJournalBtn');
+  if (jb) jb.hidden = NM.chatBot !== 'mentor';
+  var inp = document.getElementById('chatInput');
+  if (inp) inp.placeholder = b.placeholder;
+  var chip = document.getElementById('chatBusyChip');
+  if (chip && !chip.hidden) chip.textContent = '✍ ' + b.chip;
+}
+
+// v2.6.0: переключение бота текущего чата (история остаётся)
+function chatSetBot(bot) {
+  if (!BOTS[bot]) return;
+  var prev = NM.chatBot;
+  if (!NM.chatId) { chatApplyBot(bot); return; }
+  apiPost('/api/mentor/chats', { setBot: NM.chatId, bot: bot })
+    .then(function () {
+      chatApplyBot(bot);
+      var c = NM.chats.find(function (x) { return x.id === NM.chatId; });
+      if (c) c.bot = bot;
+      chatRenderList();
+      chatRenderMsgs();
+      showToast(bot === 'helper'
+        ? '🛠 В этом чате теперь отвечает Помощник'
+        : '🎓 В этом чате теперь отвечает Наставник');
+    })
+    .catch(function (e) {
+      chatApplyBot(prev);   // вернуть переключатель, если сервер отказал
+      showToast('Не поменять бота: ' + e.message);
+    });
+}
+
 function chatInit() {
   if (NM.chatInited) {
     // v2.5.0: возврат на вкладку — всегда перерисовываем ленту из состояния,
@@ -4538,16 +4622,19 @@ function chatRenderList() {
     return;
   }
   box.innerHTML = NM.chats.map(function (c) {
+    var botTag = (c.bot === 'helper') ? '<i class="ci-bot" title="В чате Помощник">🛠</i> ' : '';
     return '<div class="chat-item' + (c.id === NM.chatId ? ' active' : '') + '" data-id="' + esc(c.id) + '">' +
-      '<div class="ci-t"><b>' + esc(c.title || 'Новый чат') + '</b><span>' + c.messageCount + ' сообщ.</span></div>' +
+      '<div class="ci-t"><b>' + botTag + esc(c.title || 'Новый чат') + '</b><span>' + c.messageCount + ' сообщ.</span></div>' +
       '<button type="button" class="ci-del" data-del="' + esc(c.id) + '" aria-label="Удалить чат">🗑</button></div>';
   }).join('');
 }
 
-function chatCreate() {
-  apiPost('/api/mentor/chats', {}).then(function (d) {
+function chatCreate(bot) {
+  // v2.6.0: новый чат наследует выбранного бота (по умолчанию — текущий)
+  apiPost('/api/mentor/chats', { bot: bot || NM.chatBot }).then(function (d) {
     NM.chatId = d.chat.id;
     NM.msgs = [];
+    chatApplyBot((d.chat && d.chat.bot) || bot || 'mentor');
     // v2.4.1: заголовок тоже сбрасываем — раньше сверху оставалось имя
     // старого чата и казалось, что открылся тот же чат
     document.getElementById('chatTitle').textContent = d.chat.title || 'Новый чат';
@@ -4563,8 +4650,11 @@ function chatOpen(id) {
   box.innerHTML = '<div class="muted-lbl" style="margin:auto"><span class="spinner"></span>Загружаю чат…</div>';
   api('/api/mentor/chats?id=' + encodeURIComponent(id)).then(function (d) {
     NM.msgs = d.messages || [];
-    document.getElementById('chatTitle').textContent =
-      (NM.chats.find(function (c) { return c.id === id; }) || {}).title || 'Чат';
+    // v2.6.0: бот чата — из меты списка или из ответа сервера
+    var meta = NM.chats.find(function (c) { return c.id === id; }) || {};
+    chatApplyBot((d.chat && d.chat.bot) || meta.bot || 'mentor');
+    document.getElementById('chatTitle').textContent = meta.title ||
+      (d.chat && d.chat.title) || 'Чат';
     chatRenderMsgs();
   }).catch(function (e) {
     NM.msgs = [];
@@ -4584,13 +4674,14 @@ function chatDelete(id) {
 }
 
 function chatMsgHtml(m, i) {
+  var bot = botOf(NM.chatBot);   // v2.6.0: подпись ответа — по боту чата
   var att = '';
   if (m.imagePath) {
     var src = m.imagePath;
     if (/^layouts\//.test(src)) {
       src = '/api/mentor/layout-img?name=' + encodeURIComponent(src.slice(8));
     }
-    att = '<img class="c-img" src="' + esc(src) + '" alt="Приложенное фото макета">';
+    att = '<img class="c-img" src="' + esc(src) + '" alt="Приложенное фото">';
   }
   if (m.role === 'user') {
     var note = m.imageNote ? '<div class="c-note">фото разобрано vision-моделью</div>' : '';
@@ -4605,12 +4696,21 @@ function chatMsgHtml(m, i) {
     '<button type="button" class="c-copy" data-copy="' + i + '">⧉ Копировать ответ</button></div>';
   var body = mdRender(m.content || '');
   return '<div class="c-col">' +
-    '<div class="c-who"><span class="c-ava" aria-hidden="true">🎓</span><b>Наставник</b></div>' +
+    '<div class="c-who"><span class="c-ava" aria-hidden="true">' + bot.ava + '</span><b>' + esc(bot.name) + '</b></div>' +
     '<div class="c-bub b' + (m.error ? ' err' : '') + '">' + att + body + '</div>' +
     meta + '</div>';
 }
 
 function chatWelcomeHtml() {
+  // v2.6.0: приветствие зависит от бота чата
+  if (NM.chatBot === 'helper') {
+    return '<div class="c-empty">' +
+      '<div class="c-empty-ava" aria-hidden="true">🛠</div>' +
+      '<h4>Помощник — код без ограничений</h4>' +
+      '<p>Спроси, как написать функцию, — даст готовый код и объяснит по шагам. ' +
+      'Пришли фото (код, ошибка, макет) или файлы — разберёт сам. ' +
+      'Переключить бота — селектором сверху: 🎓 Наставник (оценки, журнал, план).</p></div>';
+  }
   return '<div class="c-empty">' +
     '<div class="c-empty-ava" aria-hidden="true">🎓</div>' +
     '<h4>Первая сессия</h4>' +
@@ -4630,12 +4730,13 @@ function chatRenderMsgs() {
   box.scrollTop = box.scrollHeight;
 }
 
-// индикатор «наставник думает» (v2.5.0: вынесен — восстановление при возврате на вкладку)
+// индикатор «бот думает» (v2.5.0: вынесен — восстановление при возврате на вкладку)
 function chatShowTyping() {
   var box = document.getElementById('chatMsgs');
   if (!box || document.getElementById('chatTyping')) return;
+  var b = botOf(NM.chatBot);
   box.insertAdjacentHTML('beforeend',
-    '<div class="c-row" id="chatTyping"><div class="c-bub b m-msg bot m-typing">Наставник думает' +
+    '<div class="c-row" id="chatTyping"><div class="c-bub b m-msg bot m-typing">' + esc(b.name) + ' думает' +
     '<span class="m-typing-dots"><i></i><i></i><i></i></span></div></div>');
   box.scrollTop = box.scrollHeight;
 }
@@ -4645,9 +4746,10 @@ function chatSend() {
   // v2.4.1: если чат ещё не создан/не открыт — создаём и отправляем в него,
   // а не молча игнорируем ввод
   if (!NM.chatId) {
-    apiPost('/api/mentor/chats', {}).then(function (d) {
+    apiPost('/api/mentor/chats', { bot: NM.chatBot }).then(function (d) {
       NM.chatId = d.chat.id;
       NM.msgs = [];
+      chatApplyBot((d.chat && d.chat.bot) || NM.chatBot);
       return chatRefreshList();
     }).then(function () { chatRenderMsgs(); chatSend(); })
       .catch(function (e) { showToast('Не создать чат: ' + e.message); });
@@ -4793,7 +4895,11 @@ function localFilesAdd(fileList) {
 
 // кнопки чата
 document.getElementById('chatSendBtn').addEventListener('click', chatSend);
-document.getElementById('chatNewBtn').addEventListener('click', chatCreate);
+document.getElementById('chatNewBtn').addEventListener('click', function () { chatCreate(); });
+// v2.6.0: переключатель бота в шапке чата
+document.getElementById('chatBotSel').addEventListener('change', function () {
+  chatSetBot(this.value);
+});
 document.getElementById('chatInput').addEventListener('keydown', function (e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend(); }
 });
