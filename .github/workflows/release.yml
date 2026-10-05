@@ -131,10 +131,20 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          VER="${GITHUB_REF_NAME#v}"
-          mkdir -p "CodeTime-src-$VER"
-          cp codetime.py mentor.py dashboard.html build_exe.bat make_icon.py requirements.txt README.md README_RU.md "CodeTime-src-$VER/"
-          zip -r "CodeTime-src-$VER.zip" "CodeTime-src-$VER"
+          python - <<'PY'
+          import os, shutil, zipfile
+          ver = os.environ['GITHUB_REF_NAME'][1:]
+          files = ['codetime.py', 'mentor.py', 'dashboard.html', 'build_exe.bat',
+                   'make_icon.py', 'requirements.txt', 'README.md', 'README_RU.md']
+          root = 'CodeTime-src-' + ver
+          os.makedirs(root, exist_ok=True)
+          for f in files:
+              shutil.copy(f, os.path.join(root, f))
+          with zipfile.ZipFile(root + '.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+              for f in files:
+                  z.write(os.path.join(root, f), root + '/' + f)
+          print('packed', root + '.zip')
+          PY
 
       # Тело релиза = сообщение коммита (generate_release_notes допишет
       # сравнение версий, приложение строку Full Changelog вырезает)
