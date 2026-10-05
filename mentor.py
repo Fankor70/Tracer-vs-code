@@ -116,19 +116,20 @@ DEFAULT_CONFIG = {
     'or_key': '',         # OpenRouter — один ключ на всю команду
 }
 
-# --- Встроенный Gemini: демо-ключ от автора CodeTime (v1.9.2) ---------
-# ВНИМАНИЕ (v2.4.2): встроенный ключ AIzaSyBkM43… СКОМПРОМЕТИРОВАН —
-# Google нашёл его в открытом репозитории и навсегда отключил
-# (403 «reported as leaked»). Он оставлен в цепочке последним шансом
-# на случай разблокировки, но считать его рабочим нельзя. Чтобы ИИ
-# работал стабильно: свой бесплатный ключ aistudio.google.com/apikey
-# → Настройки → «Свой ключ» (адрес generativelanguage.googleapis.com/v1beta/openai,
-# модель gemini-2.5-flash) — либо ключ OpenRouter.
+# --- Gemini: только СВОЙ ключ пользователя (v2.4.3) -------------------
+# Встроенный демо-ключ AIzaSyBkM43… УДАЛЁН: Google нашёл его в открытом
+# репозитории и навсегда отключил (403 «reported as leaked» — проверено
+# живыми запросами v2.4.3). Приложение работает ТОЛЬКО на ключах
+# пользователя. Для Gemini: бесплатный ключ aistudio.google.com/apikey
+# → Настройки → «Свой ключ» (адрес
+# generativelanguage.googleapis.com/v1beta/openai, модель gemini-3.8-flash)
+# — либо ключ OpenRouter: он обслуживает и личный чат, и ИИ-команду.
 GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai'
-GEMINI_DEMO_KEY = 'AIzaSyBkM43GubPwITES7z1vqI1Wa-hfxiUe4JY'
-# Порядок моделей: реальные и живые — первыми (проверено по каталогу).
-GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite',
-                 'gemini-2.0-flash', 'gemini-3.8-flash']
+# Актуальные модели Gemini (v2.4.3, проверено живыми запросами):
+# поколение 2.5/2.0 Google отключил для новых ключей («no longer
+# available to new users»), поэтому подсказки стартуют с 3.8-flash.
+GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash',
+                 'gemini-3.5-flash-lite']
 GEMINI_DISABLE_MIN = 60   # пауза после региональной блокировки/блокировки ключа, минут
 GEMINI_GET_KEY_URL = 'aistudio.google.com/apikey'
 
@@ -368,18 +369,14 @@ def save_config(patch):
 
 def api_status():
     cfg = load_config()
-    gem = _gemini_state()
-    gem_blocked = _gemini_blocked(gem)
     if cfg['or_key']:
-        mode = 'openrouter'   # OpenRouter: команда на бесплатных моделях
+        mode = 'openrouter'   # OpenRouter: чат и команда на бесплатных моделях
     elif cfg['api_key'] and cfg['api_base']:
         mode = 'key'          # свой ключ, любой OpenAI-совместимый API
     elif cfg['gh_token']:
         mode = 'github'       # GitHub Models по токену (бесплатно, с vision)
-    elif not gem_blocked:
-        mode = 'gemini'       # встроенный Gemini (демо-ключ, с vision)
     else:
-        mode = 'demo'         # резерв без ключей (Gemini временно недоступен)
+        mode = 'demo'         # резерв без ключей (текст, без vision)
     return {
         'folder': MENTOR_DIR,
         'configured': bool(cfg['api_key'] and cfg['api_base']),
@@ -387,9 +384,9 @@ def api_status():
         'orKeySet': bool(cfg['or_key']),
         'orKeyMasked': _mask(cfg['or_key']),
         'demoModel': DEMO_LLM_MODEL,
-        'geminiModel': gem.get('model') or GEMINI_MODELS[0],
-        'geminiBlocked': gem_blocked,
-        'geminiReason': (gem.get('reason') or '')[:160],
+        'geminiModel': GEMINI_MODELS[0],
+        'geminiBlocked': False,
+        'geminiReason': '',
         'ghModelsModel': GH_MODELS_MODEL,
         'apiBase': cfg['api_base'],
         'model': cfg['model'],
@@ -587,13 +584,25 @@ def _gemini_blocked(st=None):
         return False
 
 
-def _llm_chain(cfg, force_gemini=False):
-    """Список провайдеров по приоритету. Каждый:
+def _llm_chain(cfg):
+    """Список провайдеров ЛИЧНОГО чата по приоритету. Каждый:
     {mode, base, key, models, url_suffix, extra, timeout}.
-    Свой ключ — первый; если он упал НЕ по причине неверного ключа
+    v2.4.3: ключ OpenRouter обслуживает и ИИ-команду, и личный чат
+    (раньше чат его игнорировал — «боты не работают»); встроенного
+    Gemini больше нет — приложение работает только на ключах
+    пользователя. Если провайдер упал НЕ по причине неверного ключа
     (сеть, лимит, нет модели), цепочка честно уходит дальше по фолбэкам,
-    чтобы Наставник продолжал отвечать. Автор отвечает в подписи модели."""
+    чтобы Наставник продолжал отвечать."""
     chain = []
+    if cfg['or_key']:
+        chain.append({'mode': 'openrouter', 'base': OR_BASE,
+                      'key': cfg['or_key'],
+                      'models': list(dict.fromkeys(
+                          [cfg.get('or_model_mentor')
+                           or ROLE_DEFAULT_MODEL['mentor']]
+                          + OR_CHAT_FALLBACKS)),
+                      'url_suffix': '/chat/completions', 'extra': {},
+                      'timeout': 150})
     if cfg['api_key'] and cfg['api_base']:
         chain.append({'mode': 'key', 'base': cfg['api_base'].rstrip('/'),
                       'key': cfg['api_key'],
@@ -606,15 +615,6 @@ def _llm_chain(cfg, force_gemini=False):
                                 + GH_MODELS_FALLBACKS,
                       'url_suffix': '/chat/completions', 'extra': {},
                       'timeout': 150})
-    if force_gemini or not _gemini_blocked():
-        st = _gemini_state()
-        models = [st['model']] if st.get('model') else []
-        models += GEMINI_MODELS
-        chain.append({'mode': 'gemini', 'base': GEMINI_BASE,
-                      'key': GEMINI_DEMO_KEY,
-                      'models': list(dict.fromkeys(models)),
-                      'url_suffix': '/chat/completions',
-                      'extra': {'temperature': 0.6}, 'timeout': 120})
     chain.append({'mode': 'demo', 'base': DEMO_LLM_BASE,
                   'key': '',
                   # анонимный тариф Pollinations: одна модель (алиас 'openai'
@@ -627,13 +627,13 @@ def _llm_chain(cfg, force_gemini=False):
 
 def _vision_available(cfg):
     """Фото макета можно отправить, если в цепочке есть хоть одна модель
-    со зрением (свой ключ / GitHub / встроенный Gemini). Резерв Pollinations
+    со зрением (OpenRouter / свой ключ / GitHub). Резерв Pollinations
     — текст-only."""
+    if cfg['or_key']:
+        return True
     if cfg['api_key'] and cfg['api_base']:
         return True
-    if cfg['gh_token']:
-        return True
-    return not _gemini_blocked()
+    return bool(cfg['gh_token'])
 
 
 def _classify_error(e):
@@ -680,21 +680,15 @@ def _setup_report(cfg, mode_errs):
             parts.append('GitHub Models — ' + mode_errs['github'])
     else:
         parts.append('GitHub Models — токен не подключён (Настройки → GitHub)')
-    st = _gemini_state()
-    if _gemini_blocked(st):
-        parts.append('Gemini — пауза: %s' % (st.get('reason') or
-                                             'встроенный ключ заблокирован'))
-    elif 'gemini' in mode_errs:
-        parts.append('Gemini — ' + mode_errs['gemini'])
     if 'demo' in mode_errs:
         parts.append('резерв — ' + mode_errs['demo'])
     return parts
 
 
 _CHAIN_ADVICE = ('Что делать: вставьте бесплатный ключ OpenRouter '
-                 '(openrouter.ai/keys) в Настройках — это те же модели, что '
-                 'на сайте; либо подключите GitHub-токен; либо получите '
-                 'свой ключ Gemini: ' + GEMINI_GET_KEY_URL)
+                 '(openrouter.ai/keys) в Настройках — один ключ обслуживает '
+                 'и чат, и команду; либо подключите GitHub-токен; либо любой '
+                 'свой ключ (можно Gemini: ' + GEMINI_GET_KEY_URL + ')')
 
 
 def _parse_content(data):
@@ -786,7 +780,15 @@ def llm_chat(messages, model=None, timeout=None):
     cfg = load_config()
     last_err = None
     mode_errs = {}
-    for prov in _llm_chain(cfg):
+    chain = _llm_chain(cfg)
+    # v2.4.3: фото в чате — у текстовых моделей OpenRouter нет зрения,
+    # расширяем список моделей провайдера vision-фолбэками
+    if any(isinstance(m.get('content'), list) for m in messages):
+        for prov in chain:
+            if prov['mode'] == 'openrouter':
+                prov['models'] = list(dict.fromkeys(
+                    prov['models'] + OR_VISION_FALLBACKS))
+    for prov in chain:
         url = prov['base'] + prov['url_suffix']
         headers = {'Content-Type': 'application/json',
                    'User-Agent': 'CodeTime-Mentor/' + _ver()}
@@ -887,11 +889,11 @@ def _ver():
 
 
 def test_llm():
-    """Проверка ИИ: прогоняет реальную цепочку (свой ключ > GitHub > Gemini >
-    резерв) и честно докладывает, какой режим работает, а какие упали и почему.
-    Для своего ключа попутно подтягивает список доступных моделей (/models)."""
+    """Проверка ИИ: прогоняет реальную цепочку (OpenRouter > свой ключ >
+    GitHub > резерв) и честно докладывает, какой режим работает, а какие
+    упали и почему. Для своего ключа попутно подтягивает список моделей."""
     cfg = load_config()
-    chain = _llm_chain(cfg, force_gemini=True)
+    chain = _llm_chain(cfg)
     headers = {'User-Agent': 'CodeTime-Mentor/' + _ver(),
                'Content-Type': 'application/json'}
     tried = []
@@ -1163,10 +1165,10 @@ def api_chat(data):
     cfg = load_config()
     if img_b64 and not _vision_available(cfg):
         raise MentorError(
-            'У резервной демо-модели нет «зрения» — фото макета она не увидит '
-            '(встроенный Gemini сейчас недоступен). Подключите бесплатный ИИ '
-            'по GitHub-токену (один токен даст и репозиторий, и фото) или '
-            'любой свой ключ в Настройках — и попробуйте ещё раз.')
+            'Фото макета некому разобрать: у резерва нет «зрения». '
+            'Подключите бесплатный ключ OpenRouter в Настройках (модели '
+            'Qwen3.8/Gemma видят фото), GitHub-токен или любой свой ключ '
+            'с vision-моделью — и попробуйте ещё раз.')
 
     # «запомни вот это» — авто-заметка в notes/notes.md
     note_saved = False
@@ -1369,6 +1371,11 @@ OR_VISION_FALLBACKS = ['qwen/qwen3.8-27b:free',
                        'thinkingmachines/inkling-small:free',
                        'openrouter/free']
 
+# v2.4.3: фолбэки ЛИЧНОГО чата на OpenRouter — флагман мог упереться
+# в лимит бесплатного тарифа (20 запросов/мин, 50/сутки)
+OR_CHAT_FALLBACKS = ['nvidia/nemotron-3-super-120b-a12b:free',
+                     'thinkingmachines/inkling-small:free']
+
 
 def _or_role_model(cfg, role):
     return cfg.get('or_model_' + role) or ROLE_DEFAULT_MODEL.get(role) \
@@ -1460,7 +1467,7 @@ def _or_chat(key, model, messages, timeout=150):
 def call_agent(role, messages, need_vision=False):
     """Вызов агента по роли через цепочку провайдеров.
     Возвращает (text, provider, model, ms). Провайдеры:
-    openrouter → свой ключ → github → gemini(демо) → резерв(без ключей).
+    openrouter → свой ключ → github → резерв(без ключей).
     Бросает MentorError с человеческим текстом, если никто не ответил."""
     started = time.time()
     cfg = load_config()
@@ -1533,38 +1540,7 @@ def call_agent(role, messages, need_vision=False):
             if last_kind == 'auth':
                 break   # токен отклонён — другие модели не помогут
 
-    # 4) встроенный Gemini (демо-ключ; состояние блокировок кэшируется)
-    if not _gemini_blocked():
-        st = _gemini_state()
-        models = ([st['model']] if st.get('model') else []) + GEMINI_MODELS
-
-        def _gem():
-            last = None
-            for m in models:
-                payload = {'messages': messages, 'stream': False,
-                           'max_tokens': 4000, 'temperature': 0.6, 'model': m}
-                headers = {'Content-Type': 'application/json',
-                           'Authorization': 'Bearer ' + GEMINI_DEMO_KEY,
-                           'User-Agent': 'CodeTime-Mentor/' + _ver()}
-                try:
-                    text = _parse_content(_http_json(
-                        GEMINI_BASE + '/chat/completions', payload,
-                        headers, 120))
-                    _gemini_save({'model': m})
-                    return text
-                except MentorError as e:
-                    last = e
-                    if _classify_error(e) in ('region', 'leak', 'auth'):
-                        raise
-            if last:
-                raise last
-            raise MentorError('Список моделей Gemini пуст.')
-        res = try_provider('gemini', _gem)
-        if res is not None:
-            return res, 'gemini', (st.get('model') or GEMINI_MODELS[0]), \
-                time.time() - started
-
-    # 5) резерв без всяких ключей (Pollinations, текст-only)
+    # 4) резерв без всяких ключей (Pollinations, текст-only)
     if need_vision:
         raise MentorError(
             'Фото макета некому разобрать: у резервной модели нет «зрения». '

@@ -1105,7 +1105,7 @@
     <div class="side-foot">
       <span class="dot" aria-hidden="true"></span>
       <span>Всё локально на ПК</span>
-      <span class="ver" id="sideVersion">v2.4.0</span>
+      <span class="ver" id="sideVersion">v2.4.3</span>
     </div>
   </aside>
 
@@ -1313,15 +1313,15 @@
         </span>
         <span class="mv-badge" id="ownBadge">…</span>
       </h3>
-      <p class="muted-lbl">Самый надёжный вариант: лимит только ваш, ничего общего. Встроенный ключ Gemini был заблокирован Google (попал в открытый доступ) — свой бесплатный ключ решает это навсегда.</p>
+      <p class="muted-lbl">Самый надёжный вариант: лимит только ваш, ничего общего. Встроенных ключей в приложении больше нет (демо-ключ Gemini заблокирован Google) — CodeTime работает только на ваших ключах. Бесплатный ключ OpenRouter обслуживает и чат, и команду.</p>
       <div class="fld" style="margin-top:12px"><span>Адрес API (base URL)</span>
         <input class="inp" id="ownBase" type="text" placeholder="https://generativelanguage.googleapis.com/v1beta/openai" style="max-width:520px"></div>
       <div class="fld" style="margin-top:10px"><span>Ключ</span>
         <input class="inp" id="ownKey" type="password" autocomplete="off" placeholder="AIza… / sk-…" style="max-width:520px"></div>
       <div class="fld" style="margin-top:10px"><span>Модель (текст)</span>
-        <input class="inp" id="ownModel" type="text" placeholder="gemini-2.5-flash" style="max-width:520px"></div>
+        <input class="inp" id="ownModel" type="text" placeholder="gemini-3.8-flash" style="max-width:520px"></div>
       <div class="fld" style="margin-top:10px"><span>Модель для фото макетов (необязательно)</span>
-        <input class="inp" id="ownVision" type="text" placeholder="gemini-2.5-flash — понимает картинки" style="max-width:520px"></div>
+        <input class="inp" id="ownVision" type="text" placeholder="gemini-3.8-flash — понимает картинки" style="max-width:520px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         <button class="btn" id="ownSave">Сохранить</button>
         <button class="btn btn-ghost" id="ownClear" hidden>Удалить ключ</button>
@@ -1629,7 +1629,7 @@
   </section>
 </main>
 
-<footer>Наставник по фронтенду · AI-команда на бесплатных моделях OpenRouter · память — папка CodeTimeMentor на вашем ПК · <span id="footVersion">v2.4.0</span> CodeTime</footer>
+<footer>Наставник по фронтенду · AI-команда на бесплатных моделях OpenRouter · память — папка CodeTimeMentor на вашем ПК · <span id="footVersion">v2.4.3</span> CodeTime</footer>
 
   </div><!-- /app-col -->
 </div><!-- /app -->
@@ -1888,18 +1888,18 @@ function demoPost(path, body) {
       '> Оценка за сегодня: **5/10**. Вопрос: что должно происходить с миниатюрами на мобильном — горизонтальная лента или сетка 3×N?';
     return Promise.resolve({ reply: reply, journalSaved: false, planSaved: false,
       noteSaved: !!(body.message && /запомни/i.test(body.message)),
-      model: 'gemini-2.5-flash', mode: 'gemini' });
+      model: 'демо (без ИИ)', mode: 'demo' });
   }
   if (path === '/api/mentor/config') {
     return Promise.resolve({ folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: !!(body.apiKey && body.apiBase),
-      mode: body.apiKey ? 'key' : (body.ghToken ? 'github' : 'gemini'),
-      demoModel: 'openai-fast', geminiModel: 'gemini-2.5-flash', geminiBlocked: false, geminiReason: '',
+      mode: body.apiKey ? 'key' : (body.ghToken ? 'github' : (body.orKey ? 'openrouter' : 'demo')),
+      demoModel: 'openai-fast', geminiModel: 'gemini-3.8-flash', geminiBlocked: false, geminiReason: '',
       ghModelsModel: 'openai/gpt-4.1-mini',
       apiBase: body.apiBase || '', model: body.model || '', visionModel: body.visionModel || '',
       hasKey: !!(body.apiKey || ''), hasGhToken: !!(body.ghToken || ''), repo: body.repo || '',
       rolePresent: true, journalPresent: true, ghSnapshot: false });
   }
-  if (path === '/api/mentor/test-llm') return Promise.resolve({ ok: true, via: 'chat', mode: 'gemini', model: 'gemini-2.5-flash', models: [] });
+  if (path === '/api/mentor/test-llm') return Promise.resolve({ ok: true, via: 'chat', mode: 'demo', model: 'openai-fast', models: [] });
   if (path === '/api/mentor/test-github') return Promise.resolve({ ok: true, fullName: 'ваш-репозиторий', private: false, defaultBranch: 'main' });
   if (path === '/api/mentor/github-collect') return Promise.resolve({ ok: true, repo: 'ваш-репозиторий', branch: 'main', files: 12, commits: 8, ts: new Date().toISOString(), summary: 'Репозиторий собран: 12 файлов, 8 последних коммитов. Теперь наставник видит структуру — попросите «проверь мой код, файлы: путь/к/файлу».' });
   if (path === '/api/mentor/memory-save') return Promise.resolve({ ok: true, saved: Object.keys(body) });  if (path === '/api/mentor/open-folder') return Promise.resolve({ ok: true });
@@ -1949,7 +1949,7 @@ function demoPost(path, body) {
       imageNote: body.imagePath ? 'Демо: макет — страница товара, шапка, галерея слева, карточка покупки справа.' : '',
       createdAt: new Date().toISOString() };
     var am = { id: 'a' + Date.now(), role: 'assistant', content: reply2,
-      model: 'nemotron-3-ultra', provider: 'demo', createdAt: new Date().toISOString() };
+      model: 'демо (без ИИ)', provider: 'demo', createdAt: new Date().toISOString() };
     chat.messages.push(um, am);
     chat.updatedAt = am.createdAt;
     return Promise.resolve({
@@ -1982,7 +1982,7 @@ function demoPost(path, body) {
   }
   if (path === '/api/or/test') {
     return Promise.resolve({ ok: true, role: body.role || 'mentor',
-      provider: 'demo', model: 'nemotron-3-ultra', ms: 1200,
+      provider: 'demo', model: 'демо (без ИИ)', ms: 1200,
       reply: 'Связь есть, я на связи.' });
   }
   if (path === '/api/github/settings') {
@@ -2002,7 +2002,7 @@ function demoPost(path, body) {
         gitanalyst: 'Коммиты за неделю осмысленные, темп ровный. В фокусе — pages/product.html.',
         mentor: '## Итог команды\n\n**Вердикт:** база крепкая, чиним доступность и адаптив.\n\n### Порядок работы\n\n1. Кнопки вместо `div` в галерее.\n2. `aria-label` у инпутов.\n3. `px` → `rem` в product.css.\n\n| Задача | Важность | Время |\n|---|---|---|\n| Доступность галереи | высокая | 1 ч |\n| Адаптив сетки | средняя | 2 ч |\n\n> Оценка за сегодня: **6/10**. Вопрос: как миниатюры ведут себя на мобильном?'
       };
-      return { agentKey: r, model: 'nemotron-3-ultra', provider: 'demo',
+      return { agentKey: r, model: 'демо (без ИИ)', provider: 'demo',
                content: texts[r] || 'ok', ms: 4200 + i * 3600, ok: true };
     });
     return Promise.resolve({ runId: 'demo', steps: steps,
@@ -2250,8 +2250,8 @@ function demoData(path) {
   }
   if (p === '/api/roadmap') return demoRoadmap();
   if (p === '/api/mentor/status') {
-    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: false, mode: 'gemini',
-             demoModel: 'openai-fast', geminiModel: 'gemini-2.5-flash',
+    return { folder: 'C:\\Users\\Вы\\CodeTimeMentor', configured: false, mode: 'demo',
+             demoModel: 'openai-fast', geminiModel: 'gemini-3.8-flash',
              geminiBlocked: false, geminiReason: '',
              ghModelsModel: 'openai/gpt-4.1-mini',
              apiBase: '', model: '', visionModel: '',
@@ -2305,16 +2305,16 @@ function demoData(path) {
              trackKeys: true, paused: false, autostart: false,
              githubRepo: '',
              dbPath: 'C:\\Users\\Вы\\AppData\\Roaming\\CodeTime\\codetime.db',
-             version: '2.4.2' };
+             version: '2.4.3' };
   }
   if (p === '/api/update/check') {
-    return { configured: true, current: '2.4.2', latest: '2.4.2',
-             tagName: 'v2.4.2', available: false,
+    return { configured: true, current: '2.4.3', latest: '2.4.3',
+             tagName: 'v2.4.3', available: false,
              assetName: 'CodeTime.exe', assetSize: 22048000,
-             releaseUrl: '#', notes: 'Починены боты: честные ошибки по всей цепочке ИИ, свой ключ Gemini/в любом API теперь подключается в Настройках, резерв обрезает длинные промпты (раньше 402), защита от 500; чаты не путают диалоги при переключении' };
+             releaseUrl: '#', notes: 'Боты починены: ваш ключ OpenRouter теперь обслуживает и чат, и команду; мёртвый встроенный ключ Gemini удалён — только ваши ключи; фолбэки моделей в чате; в релизе лежит архив исходников для обновления локальной папки' };
   }
   if (p === '/api/update/releases') {
-    return { configured: true, current: '2.4.2', releases: demoReleases() };
+    return { configured: true, current: '2.4.3', releases: demoReleases() };
   }
   return undefined;
 }
@@ -3715,9 +3715,12 @@ function fillReleases(preferVer) {
 
 function demoReleases() {
   return [
+    { tag: 'v2.4.3', version: '2.4.3', date: '2026-10-05', assetSize: 22100000,
+      notes: 'Боты починены: ключ OpenRouter теперь обслуживает и личный чат, и ИИ-команду; мёртвый встроенный ключ Gemini удалён — приложение работает только на ваших ключах; фолбэки моделей в чате; актуальные модели Gemini для «Своего ключа»; в релизе лежит архив исходников — обновите им свою локальную папку.',
+      relation: 'current' },
     { tag: 'v2.4.0', version: '2.4.0', date: '2026-10-06', assetSize: 22092000,
       notes: 'Новый дизайн в стиле эталона: боковой сайдбар с разделами (Команда · Чат · План · Журнал · Настройки · CodeTime), топбар с заголовком, аватар и имя наставника у каждого ответа в чате, приветствие с аватаром; мобильная версия — сайдбар по бургеру. Все функции прежние: AI-команда на бесплатных моделях, чат с памятью, план с чекбоксами, журнал, трекер времени.',
-      relation: 'current' },
+      relation: 'older' },
     { tag: 'v2.0.1', version: '2.0.1', date: '2026-10-05', assetSize: 22075000,
       notes: 'АЛЬФА-фикс: чат Наставника в стиле эталона — аватар у каждого ответа, пузыри сообщений, индикатор набора, кнопка «вниз», подпись провайдера и модели (Gemini / GitHub Models / свой ключ / резерв) под каждым ответом; свой бесплатный ключ Gemini в один клик; умные фолбэки ИИ-цепочки и честные ошибки.',
       relation: 'older' },
