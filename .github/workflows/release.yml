@@ -89,7 +89,7 @@ jobs:
           except Exception as e:
               sys.exit('::error::mentor.py отсутствует или не парсится: %r' % e)
           for probe in ('def api_chat', 'def api_status', 'def ensure_all', 'CodeTimeMentor',
-                        'GEMINI_DEMO_KEY', 'last_review', 'notes.md', 'def _llm_chain'):
+                        'GEMINI_MODELS', 'OR_CHAT_FALLBACKS', 'last_review', 'notes.md', 'def _llm_chain'):
               if probe not in src:
                   sys.exit('::error::в mentor.py нет обязательного фрагмента %r' % probe)
           print('mentor.py OK: синтаксис чистый, все фрагменты на месте')
@@ -125,6 +125,17 @@ jobs:
           path: dist/CodeTime.exe
           if-no-files-found: error
 
+      # v2.4.3: архив исходников в релизе — чтобы локальную папку проекта
+      # (на ПК студента) можно было обновить целиком, а не только exe
+      - name: Pack source zip
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          mkdir -p "CodeTime-src-$VER"
+          cp codetime.py mentor.py dashboard.html build_exe.bat make_icon.py requirements.txt README.md README_RU.md "CodeTime-src-$VER/"
+          zip -r "CodeTime-src-$VER.zip" "CodeTime-src-$VER"
+
       # Тело релиза = сообщение коммита (generate_release_notes допишет
       # сравнение версий, приложение строку Full Changelog вырезает)
       - name: Prepare release body
@@ -136,7 +147,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/CodeTime.exe
+          files: |
+            dist/CodeTime.exe
+            CodeTime-src-*.zip
           body_path: release_body.md
           generate_release_notes: true
           fail_on_unmatched_files: true
