@@ -1,0 +1,28 @@
+name: Debug rulesets (temporary)
+on:
+  workflow_dispatch:
+
+permissions:
+  administration: write
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List rulesets with GITHUB_TOKEN
+        env:
+          TOK: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "=== LIST /rulesets ==="
+          curl -s -H "Authorization: Bearer $TOK" \
+            "https://api.github.com/repos/$REPO/rulesets?includes_parents=true" | head -c 6000
+          echo
+          echo "=== GET /rules/branches/v2.4.1 ==="
+          curl -s -H "Authorization: Bearer $TOK" \
+            "https://api.github.com/repos/$REPO/rules/branches/v2.4.1" | head -c 3000
+          echo
+          echo "=== GET /rules/branches/main ==="
+          curl -s -H "Authorization: Bearer $TOK" \
+            "https://api.github.com/repos/$REPO/rules/branches/main" | head -c 3000
