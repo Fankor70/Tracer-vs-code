@@ -37,11 +37,17 @@ echo.
 echo [3/4] Cleaning old build files ...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
-if exist CodeTime.spec del /q CodeTime.spec
+rem CodeTime.spec НЕ удаляем: в нём список файлов интерфейса, которые обязаны
+rem попасть внутрь exe. Раньше он удалялся, а сборка шла длинной командой
+rem только с dashboard.html — из-за этого окно выходило пустым и чёрным.
+if not exist CodeTime.spec (
+    echo [ERROR] CodeTime.spec is missing - refusing to build without it.
+    goto :fail
+)
 
 echo.
-echo [4/4] Building EXE - this may take a few minutes ...
-%PYEXE% -m PyInstaller --onefile --noconsole --name CodeTime --icon=icon.ico --add-data "dashboard.html;." --hidden-import pynput.keyboard --hidden-import pynput.keyboard._win32 --hidden-import pynput.mouse --hidden-import pynput.mouse._win32 --hidden-import pystray._win32 --collect-all webview --collect-all pythonnet --collect-all clr_loader --hidden-import webview.platforms.edgechromium --hidden-import webview.platforms.winforms codetime.py
+echo [4/4] Building EXE from CodeTime.spec - this may take a few minutes ...
+%PYEXE% -m PyInstaller --noconfirm --clean CodeTime.spec
 if errorlevel 1 goto :fail
 
 if not exist "dist\CodeTime.exe" goto :fail

@@ -1,21 +1,27 @@
-# --- Python ---
-__pycache__/
-*.py[cod]
-*.spec
-
-# --- Сборка PyInstaller ---
+# Сборка PyInstaller — 75 МБ мусора, воспроизводится через build_exe.bat
 build/
 dist/
-icon.ico
 
-# --- Служебные ---
+# Кэш Python
+__pycache__/
+*.py[cod]
+
+# Песок стенда: devserver.py подменяет USERPROFILE, там лежит фейковый профиль
+.devsandbox/
+
+# Данные приложения и логи
+*.db
+*.db-wal
+*.db-shm
 *.log
-*.old
-*.tmp
-update.tmp
-.DS_Store
-Thumbs.db
 
-# --- секреты (никогда не в репо) ---
+# Локальное окружение и секреты (никогда не коммитить)
 .env
-.gh-token
+.venv/
+venv/
+
+# Редакторы и мусор Windows
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

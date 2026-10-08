@@ -22,11 +22,10 @@ CodeTime — тихий фоновый трекер времени, провод
     последовательно «заливаются» в шаги, у каждого шага виден прогресс.
   * Задачи («Задачи»): по дням, с группировкой сегодня/завтра/послезавтра/
     через неделю/позже, режим массового удаления.
-  * Наставник («Наставник», v1.9.0): ИИ-помощник по фронтенду — чат с
-    любым OpenAI-совместимым API, фото макетов (vision), память в папке
-    %USERPROFILE%/CodeTimeMentor (journal.md/plan.md/role.txt/история),
-    чтение GitHub-репозитория студента через read-only токен.
-    См. mentor.py — все его роуты начинаются с /api/mentor/*.
+  * Наставник удалён: чат с ИИ, конвейер агентов, разбор фото макетов,
+    журнал прогресса и чтение GitHub-репозитория вырезаны из приложения
+    целиком вместе с роутами /api/mentor/*, /api/or/*, /api/team/*,
+    /api/github/*. Остался чистый трекер времени.
   * Самообновление через GitHub Releases: приложение само проверяет
     последний релиз, скачивает новый CodeTime.exe и подменяет себя
     (Настройки → Обновление).
@@ -55,14 +54,15 @@ from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-import mentor   # Наставник: ИИ-помощник по фронтенду (stdlib-only модуль)
+# ИИ-часть (наставник, чат, конвейер агентов, GitHub-интеграция) удалена:
+# её роуты начинались с /api/mentor/*, /api/or/*, /api/team/*, /api/github/*.
 
 # ============================================================
 # Константы
 # ============================================================
 
 APP_NAME = 'CodeTime'
-APP_VERSION = '2.6.0'
+APP_VERSION = '2.4.3'
 WINDOW_TITLE = 'CodeTime'   # заголовок нативного окна (и цель FindWindow)
 PORT = 5731
 BASE_URL = 'http://localhost:%d' % PORT
@@ -97,6 +97,16 @@ RUN_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
 GITHUB_REPO_DEFAULT = 'Fankor70/Tracer-vs-code'
 
 H = 3600  # секунд в часе (для целей достижений)
+
+# Файлы нового терминального интерфейса. Явный белый список: путь из запроса
+# сюда попасть не может, значит и обойти его нельзя.
+STATIC_FILES = {
+    'app.css': 'text/css; charset=utf-8',
+    'tui_widgets.js': 'text/javascript; charset=utf-8',
+    'tui.js': 'text/javascript; charset=utf-8',
+    'screens_a.js': 'text/javascript; charset=utf-8',
+    'screens_b.js': 'text/javascript; charset=utf-8',
+}
 
 
 def data_dir():
@@ -1790,6 +1800,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._serve_dashboard()
         if route == '/favicon.ico':
             return self._send(204, b'', 'text/plain')
+        if route.lstrip('/') in STATIC_FILES:
+            return self._serve_static(route.lstrip('/'))
 
         if route == '/api/overview':
             return self._api_overview(qs)
@@ -1813,53 +1825,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._api_update_releases()
         if route == '/api/update/status':
             return self._api_update_status()
-        if route == '/api/mentor/status':
-            return self._json(mentor.api_status())
-        if route == '/api/mentor/memory':
-            return self._json(mentor.api_memory())
-        if route == '/api/mentor/history':
-            return self._json(mentor.api_history(qs))
-        if route == '/api/or/settings':
-            return self._json(mentor.or_settings_get())
-        if route == '/api/team/history':
-            return self._json(mentor.team_history(qs))
-        if route == '/api/mentor/chats':
-            try:
-                if qs.get('id'):
-                    return self._json(mentor.chat_get(qs['id'][0]))
-                return self._json(mentor.chats_list())
-            except mentor.MentorError as e:
-                return self._json({'error': str(e)}, code=400)
-        if route == '/api/mentor/journal':
-            return self._json(mentor.api_journal_get())
-        if route == '/api/mentor/plan':
-            return self._json(mentor.api_plan_get())
-        if route == '/api/github/tree':
-            try:
-                return self._json(mentor.api_github_tree(qs))
-            except mentor.MentorError as e:
-                return self._json({'error': str(e)}, code=400)
-        if route == '/api/mentor/layout-img':
-            return self._api_layout_img(qs)
         return self._json({'error': 'Не найдено'}, code=404)
-
-    def _api_layout_img(self, qs):
-        """GET /api/mentor/layout-img?name=… — фото макета из layouts/."""
-        name = (qs.get('name', [''])[0] or '').strip()
-        if ('/' in name or '\\' in name or '..' in name or not name):
-            return self._send(400, b'bad name', 'text/plain')
-        path = os.path.join(mentor.LAYOUTS_DIR, name)
-        if not os.path.isfile(path):
-            return self._send(404, b'not found', 'text/plain')
-        ext = os.path.splitext(name)[1].lower()
-        mime = {'.png': 'image/png', '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-                '.gif': 'image/gif'}.get(ext, 'application/octet-stream')
-        try:
-            with open(path, 'rb') as f:
-                return self._send(200, f.read(), mime)
-        except OSError:
-            return self._send(500, b'read error', 'text/plain')
 
     def _serve_dashboard(self):
         try:
@@ -1868,6 +1834,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, html, 'text/html; charset=utf-8')
         except Exception as e:
             self._send(500, 'Не найден dashboard.html: %s' % e, 'text/plain; charset=utf-8')
+
+    def _serve_static(self, name):
+        """Отдача файлов нового интерфейса. Только явный белый список —
+        никакого разбора пути, поэтому обойти нельзя даже теоретически."""
+        try:
+            with open(resource_path(name), 'rb') as f:
+                body = f.read()
+            self._send(200, body, STATIC_FILES[name])
+        except FileNotFoundError:
+            self._send(404, 'Не найден %s' % name, 'text/plain; charset=utf-8')
+        except OSError as e:
+            self._send(500, 'Не удалось прочитать %s: %s' % (name, e),
+                       'text/plain; charset=utf-8')
 
     def _api_overview(self, qs):
         app = APP
@@ -2113,11 +2092,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._api_settings_post()   # исторический роут (старый формат разбора)
         if route == '/api/update':
             return self._api_update()          # сырые байты exe, не JSON
-        if (route.startswith('/api/mentor/') or route.startswith('/api/or/')
-                or route.startswith('/api/team/')
-                or (route.startswith('/api/github/')
-                    and route != '/api/github/tree')):
-            return self._mentor_post(route)
         handler = self.POST_ROUTES.get(route)
         if handler is None:
             return self._json({'error': 'Не найдено'}, code=404)
@@ -2133,25 +2107,6 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as e:
             # ошибки валидации тела -> 400 {error}
             return self._json({'error': str(e)}, code=400)
-
-    def _mentor_post(self, route):
-        """POST /api/mentor/* — диспетчер в mentor.py с понятными ошибками.
-        Тело может быть большим (фото макета в base64), читаем целиком."""
-        try:
-            length = int(self.headers.get('Content-Length') or 0)
-            data = json.loads(self.rfile.read(length).decode('utf-8') or '{}')
-        except (ValueError, UnicodeDecodeError) as e:
-            return self._json({'error': 'Некорректный JSON: %r' % e}, code=400)
-        if not isinstance(data, dict):
-            return self._json({'error': 'Ожидался JSON-объект'}, code=400)
-        try:
-            return self._json(mentor.api_post(route, data))
-        except mentor.MentorError as e:
-            return self._json({'error': str(e)}, code=400)
-        except Exception as e:
-            logging.exception('Наставник: ошибка обработки %s: %r', route, e)
-            return self._json({'error': 'Внутренняя ошибка Наставника: %s' % e},
-                              code=500)
 
     def _api_settings_post(self):
         try:
@@ -3214,12 +3169,6 @@ def main():
     _t_mei.start()
 
     logging.info('CodeTime %s запускается...', APP_VERSION)
-
-    # Наставник: папка памяти %USERPROFILE%\CodeTimeMentor и файлы по умолчанию
-    try:
-        mentor.ensure_all()
-    except Exception as e:
-        logging.warning('Наставник: не удалось подготовить папку: %r', e)
 
     app = CodeTimeApp()
     APP = app

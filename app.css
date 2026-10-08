@@ -1,0 +1,3046 @@
+/* ==========================================================================
+   CodeTime — терминальный TUI. Единственный файл оформления.
+   Порядок разделов повторяет номера DESIGN_SPEC.md:
+     1  токены (§2)          9  календарь месяца (§9)
+     2  база и сброс         10 тепловая карта года (§10)
+     3  каркас страницы (§3) 11 бар-чарт по дням (§11)
+     4  верхнее меню (§4)    12 пресеты-чипы (§12)
+     5  панель (§5)          13 список задач (§13)
+     6  строки данных (§6)   14 прочие экраны (§14)
+     7  чекбокс (§7)         15 кнопки и поля ввода
+     8  полоса прогресса(§8) 16 модалки и тосты (§16)
+     17 служебное            18 адаптивные состояния
+   Без скруглений, без внешних шрифтов, без зависимостей.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. ТОКЕНЫ (§2)
+   ========================================================================== */
+
+:root {
+  /* Единственный моноширинный стек приложения. Никаких системных шрифтов. */
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Cascadia Code', 'JetBrains Mono',
+               'SF Mono', Consolas, 'DejaVu Sans Mono', 'Liberation Mono',
+               'Courier New', monospace;
+
+  /*
+    --- тёмная тема (по умолчанию) ---
+    Значения сняты пиксельно с эталона, а не подобраны на глаз:
+    фон #0f1015, рамка #1c1e24 (всего на 3..30 единиц светлее фона —
+    панели в эталоне почти невесомые).
+  */
+  --bg:         #0f1015;  /* фон окна (замер) */
+  --bg-panel:   #0f1015;  /* фон панели — тот же, различает только рамка */
+  --bg-raised:  #171922;  /* строка-привычка, активная строка, наведение */
+  --bg-inset:   #08090c;  /* поля ввода, «инвертированные» блоки */
+  --border:     #1c1e24;  /* рамка панели (замер: едва светлее фона) */
+  --border-lit: #2f323d;  /* рамка активной панели / фокус */
+  --fg:         #c9d1d9;  /* основной текст */
+  --fg-dim:     #8b949e;  /* приглушённый: подписи, второстепенные строки */
+  --fg-faint:   #4c515c;  /* почти невидимый: разделители, выключенное */
+  --gold:       #deb365;  /* ОСНОВНОЙ акцент: полосы, галочки, сегодня */
+  --green:      #3fb950;  /* выполнено, прогресс, хорошие значения */
+  --amber:      #cb9734;  /* насыщенный янтарь: заливки, активные чипы */
+  --amber-tx:   #dec283;  /* светлый янтарь для текста-акцента */
+  --today:      #f99f61;  /* оранжевый: ячейка «сегодня» в календаре */
+  --red:        #f85149;  /* опасное, удаление, перерасход */
+  --blue:       #5d77cb;  /* ссылки, активный пункт меню (замер) */
+  --blue-lit:   #687aac;  /* светлый вариант того же синего */
+  --violet:     #9176bd;  /* проекты, иконка «вечерней» группы (замер) */
+
+  /*
+    Синий ДЛЯ ТЕКСТА. `--blue` (#5d77cb) — ровно замер, и как заливка он
+    верен, но на фоне #0f1015 даёт 4.49:1, то есть на сотую ниже порога.
+    Для букв, подчёркиваний и кареток берём на ступень светлее: 5.58:1.
+  */
+  --blue-text:  #6f88d6;
+
+  /*
+    --- градиенты ---
+    Объявлены здесь и больше нигде: правила ниже только ссылаются на токены,
+    поэтому палитра меняется в одной точке. 180deg — сверху вниз,
+    90deg — слева направо.
+
+    Контраст каждой ступени проверен и к фону #0f1015, и к --bg-raised
+    #171922 (под наведением), худшая ступень каждой шкалы:
+      тёплый 6.69, синий 4.86, фиолетовый 4.61, оранжевый 6.97 — все
+      выше 4.5.
+  */
+  --grad-warm:   linear-gradient(180deg, #f9d599 0%, #deb365 55%, #cb9734 100%);
+  --grad-warm-x: linear-gradient(90deg,  #cb9734 0%, #deb365 100%);
+  --grad-blue:   linear-gradient(180deg, #8b9ada 0%, #6f88d6 55%, #6a84d0 100%);
+  --grad-violet: linear-gradient(180deg, #bda9dd 0%, #a992d0 55%, #9176bd 100%);
+  --grad-orange: linear-gradient(180deg, #f9ab72 0%, #f99f61 55%, #f4864a 100%);
+  --grad-today:  linear-gradient(180deg, #f9ab72 0%, #f4864a 100%);
+  /* Подложка активного чипа: та же тёплая шкала, но в прозрачности. */
+  --grad-warm-tint: linear-gradient(180deg,
+                   rgba(249, 213, 153, .18), rgba(203, 151, 52, .10));
+
+  /*
+    Ступени интенсивности для вклада (§10) и календаря (§9).
+    В эталоне тепловая карта ЯНТАРНАЯ, а не зелёная: шесть ступеней от
+    почти фона до чистого #deb365. Контраст к фону — 1.25 / 1.51 / 2.16 /
+    4.00 / 6.63 / 9.72: тёмнейшая всё ещё отличается от фона, но читается
+    как «пусто».
+  */
+  --hm-0: #23252f;   /* нет данных — на тон светлее фона, но ещё тьма */
+  --hm-1: #3a3320;
+  --hm-2: #56492c;
+  --hm-3: #8a6f3c;
+  --hm-4: #b8934f;
+  --hm-5: #deb365;   /* полная активность */
+
+  /* Затемнение под модалкой (§16). */
+  --scrim: rgba(0, 0, 0, .62);
+
+  /* Шкала отступов. */
+  --sp-1: 2px;   --sp-2: 4px;   --sp-3: 6px;   --sp-4: 8px;
+  --sp-5: 10px;  --sp-6: 12px;  --sp-7: 16px;  --sp-8: 20px;
+  --sp-9: 24px;  --sp-10: 32px;
+
+  /*
+    Метрики каркаса — сняты пиксельно с эталона (окно 968px):
+      левая 242px, центр 325px, правая 325px, зазор 13px,
+      боковые поля 25px, строка меню и футер по 30px.
+    --col-m — ПОТОЛок центральной колонки: остаток ширины окна не
+    достаётся середине, сетка центрируется и лишнее уходит в поля.
+    --pad-x — боковое поле окна; от него отталкиваются минусовые
+    отступы меню и футера, чтобы линии шли на всю ширину окна.
+  */
+  --head-h:  18px;   /* высота строки заголовка панели */
+  --bar-h:    6px;   /* высота полосы прогресса (замер) */
+  --bar-w:   45px;   /* ширина полосы прогресса (замер) */
+  --hit:     20px;   /* минимальная цель нажатия */
+  --col-l:  242px;   /* ширина левой колонки (замер) */
+  --col-m:  325px;   /* потолок центральной колонки (замер) */
+  --col-r:  325px;   /* ширина правой колонки (замер) */
+  --col-gap: 13px;   /* зазор между колонками (замер) */
+  --pad-x:  0px; /* боковые поля окна убраны по требованию: колонки
+                    занимают всю ширину. В замере эталона было 25px,
+                    но осталось мёртвое поле — убираем. Правка
+                    намеренная, не возвращать «по памяти». */
+  --bar-h-menu: 30px; /* высота строки меню (замер) */
+  --bar-h-foot: 30px; /* высота строки футера (замер) */
+
+  /* Шкала слоёв. */
+  --z-base:    0;
+  --z-sticky: 10;
+  --z-menu:    20;
+  --z-modal:   100;
+  --z-toast:   120;
+
+  color-scheme: dark;
+}
+
+/*
+  Светлая тема. Это НЕ инверсия: папирусный фон, тёмно-серый текст,
+  приглушённые (а не ослепительные) акценты. Все значения подобраны так,
+  чтобы --fg-dim держал 4.5:1 на всех четырёх поверхностях.
+*/
+[data-theme="light"] {
+  --bg:         #e9e5da;
+  --bg-panel:   #f7f4ed;
+  --bg-raised:  #e5e0d2;
+  --bg-inset:   #dcd6c5;
+  --border:     #cfc8b6;
+  --border-lit: #7d7462;
+  --fg:         #1f262d;
+  --fg-dim:     #525c64;
+  --fg-faint:   #8f8a7d;
+  --gold:       #8a6318;
+  --green:      #1a7f37;
+  --amber:      #8a6100;
+  --amber-tx:   #6f4e10;
+  --today:      #a8541a;
+  --red:        #c92a2a;
+  --blue:       #3a4fa8;
+  --blue-lit:   #5a6ec4;
+  --violet:     #6f4aa8;
+
+  --blue-text:  #3a4fa8;
+
+  /*
+    Градиенты светлой темы — переопределены полностью, а не наследуются.
+    Кремово-янтарная шкала тёмной темы на папирусе почти не видна, поэтому
+    здесь направление обращено: тёмный верх → тёмно-янтарный низ.
+    Худшая ступень держит 5.83:1 на панели #f7f4ed, 5.09:1 на фоне окна
+    #e9e5da и 4.86:1 на --bg-raised — то есть и заголовки панелей, лежащие
+    прямо на фоне окна, порог проходят.
+  */
+  --grad-warm:   linear-gradient(180deg, #6d4a0a 0%, #75520f 52%, #7d5812 100%);
+  --grad-warm-x: linear-gradient(90deg,  #7d5812 0%, #6d4a0a 100%);
+  --grad-blue:   linear-gradient(180deg, #4157b8 0%, #3a4fa8 100%);
+  --grad-violet: linear-gradient(180deg, #7150ab 0%, #6a459e 100%);
+  --grad-orange: linear-gradient(180deg, #8a4520 0%, #934a16 100%);
+  --grad-today:  linear-gradient(180deg, #a8541a 0%, #8f4413 100%);
+  --grad-warm-tint: linear-gradient(180deg,
+                   rgba(198, 154, 58, .22), rgba(138, 97, 0, .10));
+
+  /* Тепловая карта светлой темы — тот же янтарный ряд, но светлее к тёмному. */
+  --hm-0: #e5dfcc;
+  --hm-1: #e6d9b6;
+  --hm-2: #dcc188;
+  --hm-3: #c99b3f;
+  --hm-4: #a8791c;
+  --hm-5: #8a6100;
+
+  --scrim: rgba(40, 36, 28, .38);
+
+  color-scheme: light;
+}
+
+
+/* ==========================================================================
+   2. БАЗА И СБРОС
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  /* Скруглений в приложении нет вообще — это терминал. */
+  border-radius: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  /* §0 плотность: базовый кегль 13px, интерлиньяж 1.35. */
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeSpeed;
+  /* Числа во всём приложении выравниваются по разрядам (§6). */
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--fg-dim);
+  color: var(--bg);
+}
+
+/* Тонкий терминальный скроллбар. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-lit) var(--bg-inset);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-inset);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-lit);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-faint);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg-inset);
+}
+
+/* Кнопки и поля наследуют моноширинный шрифт окна. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  font-variant-numeric: inherit;
+  letter-spacing: normal;
+  color: inherit;
+  margin: 0;
+}
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+/* Ссылки в терминале — голубые. Берётся --blue-text, а не --blue:
+   подчёркивание красится currentColor, а у #5d77cb на #0f1015 выходит
+   4.49:1 — на сотую ниже порога. */
+a {
+  color: var(--blue-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+
+/* ==========================================================================
+   3. КАРКАС СТРАНИЦЫ (§3)
+   ========================================================================== */
+
+.tui {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sp-3) var(--pad-x) var(--sp-3);
+  gap: var(--sp-4);
+  min-width: 0;
+  /* clip, а не hidden: горизонтальный конвейер обрезается,
+     вертикальный поток остаётся видимым (выпадающее меню §4). */
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.tui-menu,
+.tui-footer {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/*
+  Геометрия снята с эталона: 242 / 325 / 325 при зазоре 13px.
+
+  Дальше — правка по требованию: боковые поля убраны, колонки занимают всю
+  ширину окна. Левая и правая остаются по замеру, весь остаток забирает
+  средняя (1fr), поэтому мёртвого поля по краям больше нет. На ширине
+  самого эталона (918px контента) результат совпадает с ним в точности.
+*/
+.tui-body {
+  display: grid;
+  grid-template-columns: 242fr 325fr 325fr;
+  align-content: stretch;
+  flex: 1 1 auto;
+  gap: var(--col-gap);
+  min-height: 0;
+  min-width: 0;
+  /* Пересчёт при resize делает JS; здесь только ширины и зазоры,
+     чтобы таблицы псевдографики не требовали фиксированных ширин. */
+}
+
+.tui-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* Колонки — элементы CSS-grid: ширину задаёт трек сетки, а не сам
+   элемент. Раньше здесь стояли `width: var(--col-l)` и `width: var(--col-r)`
+   — они перебивали сетку, и на широком окне левая и правая оставались
+   242/325px, пока всю остальную ширину забирала средняя. `flex` здесь
+   инертен: родитель — grid, не flex. Убрано и то и другое. */
+.tui-col--left,
+.tui-col--mid,
+.tui-col--right {
+  min-width: 0;
+}
+
+/* §7: футер по центру, мелко, приглушённо, линия сверху на всю ширину. */
+.tui-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-1);
+  min-height: var(--bar-h-foot);
+  /* Линия идёт на всю ширину окна, а не только по полям. */
+  margin: 0 calc(var(--pad-x) * -1);
+  padding: var(--sp-2) var(--pad-x) 0;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/*
+  Разделитель `·` между подсказками футера ставит JS текстовым узлом,
+  поэтому в CSS он НЕ дублируется. Здесь только гасим растягивание
+  `.grow`, иначе блок подсказок съест всю строку и центрирование
+  перестанет работать.
+*/
+.tui-footer .tui-footer-hints {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.tui-footer .tui-theme {
+  flex: 0 0 auto;
+  min-height: var(--head-h);
+  padding: 0 var(--sp-2);
+  font-size: 11px;
+}
+
+.tui-footer kbd,
+.menu-hints kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-right: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: inherit;
+  text-align: center;
+}
+
+
+/* ==========================================================================
+   4. ВЕРХНЕЕ МЕНЮ (§4)
+   ========================================================================== */
+
+/* §1: строка меню — 30px, тонкая линия на всю ширину окна. */
+.tui-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-1);
+  min-height: var(--bar-h-menu);
+  /* Линия идёт на всю ширину окна, а не только по полям. */
+  margin: 0 calc(var(--pad-x) * -1);
+  padding: 0 var(--pad-x) var(--sp-1);
+  border-bottom: 1px solid var(--border);
+  z-index: var(--z-menu);
+}
+
+.menu-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-1);
+  min-width: 0;
+}
+
+.menu-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+/* `[h]` — рамка вокруг первой буквы названия. Внутри — сама буква. */
+.brand {
+  display: inline-block;
+  min-width: 1.35em;
+  padding: 0 var(--sp-1);
+  border: 1px solid var(--border-lit);
+  color: var(--gold);
+  font-weight: 700;
+  text-align: center;
+}
+
+/* `[beta]` — приглушённый, в квадратных скобках. */
+.beta {
+  color: var(--fg-dim);
+  font-style: normal;
+}
+
+/* Разделитель пунктов — `·` цвета --fg-faint. */
+.menu-sep {
+  color: var(--fg-faint);
+  user-select: none;
+}
+
+.mi {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit);
+  padding: 0 var(--sp-2);
+  color: var(--fg-dim);
+  background: none;
+  white-space: nowrap;
+}
+
+.mi:hover {
+  color: var(--fg);
+  background: var(--bg-raised);
+}
+
+.mi:focus-visible {
+  outline: 1px solid var(--border-lit);
+  outline-offset: -1px;
+}
+
+/*
+  §1: активный пункт — синий, подчёркнутый, с кареткой `▾` справа.
+  Каретка рисуется псевдоэлементом, чтобы JS не зависел от текста.
+*/
+.mi.is-on,
+.mi.on,
+.mi[aria-current="page"],
+.mi[aria-current="true"] {
+  color: var(--blue);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.mi.is-on::after,
+.mi.on::after,
+.mi[aria-current="page"]::after,
+.mi[aria-current="true"]::after {
+  content: "\25BE";
+  margin-left: var(--sp-2);
+  color: var(--blue);
+  text-decoration: none;
+  user-select: none;
+}
+
+.menu-hints {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-size: 11px;
+}
+
+/* Кнопка `≡ меню` — только на узких экранах (§4, ниже в §18). */
+.menu-more {
+  display: none;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--hit);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.menu-more:hover {
+  border-color: var(--border-lit);
+  background: var(--bg-raised);
+}
+
+
+/* ==========================================================================
+   5. ПАНЕЛЬ (§5)
+   ========================================================================== */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: calc(var(--head-h) + 20px);
+  min-width: 0;
+}
+
+/* Заголовок ВЫШЕ рамки — так в терминале. Кегль как у текста. */
+.panel-h,
+.modal-h {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+  min-width: 0;
+  height: var(--head-h);
+  padding: 0 var(--sp-2);
+  color: var(--fg);
+  font-size: inherit;
+  line-height: 1.35;
+}
+
+.panel-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+/* `$` — приглушённый, жирный, не выделяется по размеру. */
+.sig {
+  margin-right: var(--sp-2);
+  color: var(--fg-dim);
+  font-style: normal;
+  font-weight: 700;
+  user-select: none;
+}
+
+.panel-a {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 0 0 auto;
+}
+
+/* `[close]` / `×` — у самого правого края заголовка, приглушён. */
+.panel-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: var(--head-h);
+  height: var(--head-h);
+  color: var(--fg-faint);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.panel-x:hover {
+  color: var(--red);
+}
+
+.panel-b,
+.modal-b {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  /* §0 плотность: внутренний отступ панели 10px по вертикали, 12px по горизонтали. */
+  padding: var(--sp-5) var(--sp-6);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+/* Активная панель: рамка --border-lit и `▌` слева в заголовке (§15). */
+.panel.is-focus > .panel-b,
+.panel--focus > .panel-b,
+.panel[data-focus="true"] > .panel-b,
+.panel[data-focused="true"] > .panel-b {
+  border-color: var(--border-lit);
+}
+
+.panel.is-focus > .panel-h::before,
+.panel--focus > .panel-h::before,
+.panel[data-focus="true"] > .panel-h::before,
+.panel[data-focused="true"] > .panel-h::before {
+  content: "▌";
+  flex: 0 0 auto;
+  margin-left: -4px;
+  margin-right: 2px;
+  color: var(--blue);
+  user-select: none;
+}
+
+/* --- заголовок секции внутри панели --- */
+.sec {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
+  margin: var(--sp-6) 0 var(--sp-2);
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--fg);
+  font: inherit;
+  font-size: inherit;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sec:first-child {
+  margin-top: 0;
+}
+
+/*
+  §6: иконка секции (`◇ ♨ ⊞ ⇶ 🏆`) — по базовой линии текста,
+  размер наследуется, эмодзи-глифы не растягиваются.
+*/
+.sec-i {
+  flex: 0 0 auto;
+  color: var(--fg-dim);
+  font-size: inherit;
+  line-height: 1.35;
+  font-style: normal;
+  user-select: none;
+}
+
+.sec-t {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.sec:hover .sec-t {
+  color: var(--gold);
+}
+
+/* Метка окна данных `[30d]` — приглушённая, в квадратных скобках. */
+.sec-w {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: var(--sp-2);
+  color: var(--fg-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sec-b {
+  min-width: 0;
+}
+
+.sec[aria-expanded="false"] + .sec-b,
+.sec[aria-expanded="false"] + .sec-body {
+  display: none;
+}
+
+/* Метка окна может приходить отдельным элементом с квадратными скобками. */
+.sec-win {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: var(--sp-2);
+  color: var(--fg-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+
+/* ==========================================================================
+   6. СТРОКИ ДАННЫХ (§6)
+   ========================================================================== */
+
+/*
+  §6: строка данных — `подпись: значение`. Значение стоит СРАЗУ после
+  двоеточия, а не прижато к правому краю, поэтому поток строчный, а не
+  трёхколоночный. Строка может переноситься на узких окнах.
+*/
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--sp-2);
+  min-height: var(--head-h);
+  min-width: 0;
+}
+
+.row-k {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.row-dim {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-dim);
+}
+
+.row-dim:empty,
+.row-v:empty {
+  display: none;
+}
+
+/* Значение сразу за подписью, выравнивание по левому краю ячейки. */
+.row-v {
+  flex: 0 0 auto;
+  margin-left: 0;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* Явная метка: прижать значение вправо (как в таблицах проектов). */
+.row--right {
+  justify-content: space-between;
+}
+
+.row--right .row-v {
+  margin-left: auto;
+  text-align: right;
+}
+
+.row-v--dim {
+  color: var(--fg-dim);
+}
+
+.row-v--gold {
+  color: var(--gold);
+}
+
+.row-v--green {
+  color: var(--green);
+}
+
+.row-v--amber {
+  color: var(--amber);
+}
+
+.row-v--red {
+  color: var(--red);
+}
+
+/* Строка целиком кликабельна, но выглядит как строка списка (§7). */
+.row--act {
+  cursor: pointer;
+}
+
+.row--act:hover {
+  background: var(--bg-raised);
+}
+
+/*
+  Комментарий-пояснение. Префикс `//` рисует сам CSS,
+  поэтому текст сюда передаётся БЕЗ префикса.
+*/
+.cmt,
+.row-hint {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  color: var(--fg-dim);
+  font-style: italic;
+  /* Пояснения на строкой мельче основного текста: длинные английские
+     подписи в правой колонке («consecutive days hitting your daily goal»)
+     при 13px переносились на две строки, а в эталоне каждая в одну. */
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.cmt::before,
+.row-hint::before {
+  content: "// ";
+  color: var(--fg-faint);
+  font-style: normal;
+  user-select: none;
+}
+
+.cmt--faint {
+  color: var(--fg-faint);
+}
+
+/* Пустой список/секция — одна поясняющая строка. */
+.empty {
+  display: block;
+  padding: var(--sp-2) 0;
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+
+/* ==========================================================================
+   7. ЧЕКБОКС В СТИЛЕ ОБОЛОЧКИ (§7)
+   ========================================================================== */
+
+/*
+  §5/§7: чекбокс — пара настоящих квадратных скобок `[ ]`, а не иконка.
+  `::before` рисует всю тройку символов, поэтому разметке достаточно
+  пустого <span class="cbx"></span> с aria-pressed.
+*/
+.cbx {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 3ch;
+  min-height: var(--head-h);
+  padding: 0;
+  color: var(--fg);
+  background: none;
+  font: inherit;
+  white-space: pre;
+  letter-spacing: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cbx::before {
+  content: "[ ]";
+  color: var(--fg-faint);
+}
+
+.cbx:hover::before {
+  color: var(--fg-dim);
+}
+
+.cbx:focus-visible {
+  outline: 1px solid var(--border-lit);
+  outline-offset: -1px;
+}
+
+/* Выполнено — `[✓]`, зелёный. §8: зелёный только для «сделано». */
+.cbx[aria-pressed="true"]::before,
+.cbx.is-on::before,
+.cbx[aria-checked="true"]::before {
+  content: "[✓]";
+  color: var(--green);
+}
+
+.cbx[aria-pressed="true"]:hover::before,
+.cbx.is-on:hover::before {
+  color: var(--green);
+}
+
+/* Половина выполнено — `[·]`, янтарный. */
+.cbx[aria-pressed="mixed"]::before,
+.cbx.is-half::before {
+  content: "[·]";
+  color: var(--amber);
+}
+
+.cbx[aria-pressed="mixed"]:hover::before,
+.cbx.is-half:hover::before {
+  color: var(--amber);
+}
+
+/* Выполненная строка: текст гаснет и зачёркивается (§7). */
+.row--done .row-k,
+.trow--done .trow-t,
+.pstep--done .pstep-t {
+  color: var(--fg-dim);
+  text-decoration: line-through;
+  text-decoration-color: var(--fg-faint);
+  text-decoration-thickness: 1px;
+}
+
+.row--done .row-v,
+.trow--done .trow-d,
+.pstep--done .pstep-d {
+  color: var(--fg-faint);
+}
+
+
+/* ==========================================================================
+   8. ПОЛОСА ПРОГРЕССА (§8)
+   ========================================================================== */
+
+.bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+/*
+  Замер с эталона: полоса 6px × 45px. Ширина фиксированная, чтобы в
+  панели статуса она не растягивалась на всю колонку; в длинных
+  списках полоса остаётся узкой и не ломает поток.
+*/
+.bar {
+  position: relative;
+  display: block;
+  flex: 0 0 var(--bar-w);
+  width: var(--bar-w);
+  min-width: 0;
+  max-width: 100%;
+  height: var(--bar-h);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* Заливка — основной янтарный акцент #deb365. */
+.bar-f {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--gold);
+  transition: width .25s ease;
+}
+
+/* Близко к цели, но не закрыта. */
+.bar--near .bar-f,
+.bar--amber .bar-f,
+.bar--warn .bar-f {
+  background: var(--amber);
+}
+
+/* Перерасход. */
+.bar--over .bar-f,
+.bar--red .bar-f {
+  background: var(--red);
+}
+
+/* Тонкая альтернатива для списков — без подписи. */
+.bar--thin {
+  height: 3px;
+}
+
+.bar--thin .bar-f {
+  transition: none;
+}
+
+/* В списках проектов полоса тянется по свободному месту. */
+.plist-bar {
+  width: auto;
+  flex: 1 1 auto;
+}
+
+/* Подпись справа: `68% (4ч06м / 6ч)`, по разрядам. */
+.bar-cap {
+  flex: 0 0 auto;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bar-cap--green {
+  color: var(--green);
+}
+
+.bar-cap--amber {
+  color: var(--amber);
+}
+
+.bar-cap--red {
+  color: var(--red);
+}
+
+
+/* ==========================================================================
+   9. КАЛЕНДАРЬ МЕСЯЦА (§9)
+   ========================================================================== */
+
+.cal {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cal-hd {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.cal-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: var(--hit);
+  min-height: var(--head-h);
+  color: var(--fg-dim);
+  background: none;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cal-nav:hover {
+  color: var(--fg);
+  background: var(--bg-raised);
+}
+
+/* Название месяца — строчными, по центру, `‹` и `›` по краям строки. */
+.cal-t,
+.cal-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* Заголовки дней недели — по две строчные латинские буквы, приглушённые. */
+.cal-wd {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: var(--sp-1);
+}
+
+.cal-wd > span,
+.cal-wd > i,
+.cal-wd > .cal-wd-c {
+  height: 16px;
+  color: var(--fg-dim);
+  font-size: inherit;
+  font-style: normal;
+  line-height: 16px;
+  letter-spacing: 0;
+  text-align: center;
+  overflow: hidden;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+.cal-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 1px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 1px 3px 0;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.25;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cal-cell:hover {
+  background: var(--bg-raised);
+}
+
+/* Число дня — приглушённое, выровнено вправо внутри своей ячейки. */
+.cal-cell-n {
+  display: block;
+  min-width: 0;
+  color: var(--fg-dim);
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Выходящие за месяц дни и дни без активности — ещё тише. */
+.cal-cell--out {
+  color: var(--fg-faint);
+}
+
+.cal-cell--out .cal-cell-n {
+  color: var(--fg-faint);
+}
+
+.cal-cell--zero .cal-cell-n {
+  color: var(--fg-dim);
+}
+
+/*
+  Сегодня — единственный яркий акцент календаря: оранжевая заливка
+  #f99f61 и треугольник `▲` ПОД числом. Полоска активности при этом
+  стоит над числом, поэтому `::after` треугольника выносится в конец
+  потока, а `.cal-bar` получает `order: -1`.
+*/
+.cal-cell--today,
+.cal-cell.is-today {
+  background: var(--today);
+}
+
+.cal-cell--today:hover,
+.cal-cell.is-today:hover {
+  background: var(--today);
+}
+
+.cal-cell--today .cal-cell-n,
+.cal-cell.is-today .cal-cell-n {
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.cal-cell--today::after,
+.cal-cell.is-today::after {
+  content: "\25B2";
+  display: block;
+  order: 2;
+  margin-top: auto;
+  color: var(--bg);
+  font-size: 8px;
+  line-height: 1;
+  text-align: right;
+  user-select: none;
+}
+
+.cal-cell:focus-visible {
+  outline: 1px solid var(--border-lit);
+  outline-offset: -2px;
+}
+
+/*
+  Полоска активности за день: 3px во всю ширину ячейки, стоит НАД
+  числом (order: -1), поэтому треугольник `▲` остаётся снизу.
+*/
+.cal-bar {
+  order: -1;
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-bottom: 1px;
+  background: transparent;
+}
+
+/* Ступени интенсивности — общие для календаря и вклада (§9, §10).
+   Раньше .i4 и .i5 делили одну ступень; теперь верхняя отделена. */
+.i0, .hm-i0, .lvl0 { background: var(--hm-0); }
+.i1, .hm-i1, .lvl1 { background: var(--hm-1); }
+.i2, .hm-i2, .lvl2 { background: var(--hm-2); }
+.i3, .hm-i3, .lvl3 { background: var(--hm-3); }
+.i4, .hm-i4, .lvl4 { background: var(--hm-4); }
+.i5, .hm-i5, .lvl5 { background: var(--hm-5); }
+
+/*
+  Легенда вклада: строка `// меньше ░▒▓█ больше`. Префикс `// ` рисует
+  `.cmt::before`, поэтому в CSS он НЕ добавляется — иначе будет `// //`.
+  Подпись приходит отдельным абзацем в `.hm-wrap`.
+*/
+.hm-wrap > .cmt {
+  display: block;
+  margin-top: var(--sp-3);
+  color: var(--fg-dim);
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hm-lg {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  color: var(--fg-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.hm-lg-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--border);
+}
+
+
+/* ==========================================================================
+   10. ТЕПЛОВАЯ КАРТА ГОДА (§10)
+   ========================================================================== */
+
+.hm-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.hm {
+  width: max-content;
+  min-width: 0;
+}
+
+/* Подписи месяцев ставятся только в колонку, где месяц начинается. */
+.hm-mos {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 11px;
+  gap: 2px;
+  margin-left: 14px;
+  height: 13px;
+}
+
+/* Трёхбуквенные строчные подписи месяцев, приглушённые. */
+.hm-mo,
+.hm-mo.faint {
+  color: var(--fg-dim);
+  font-size: 10px;
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.hm-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+.hm-lbs {
+  display: grid;
+  grid-template-rows: repeat(7, 9px);
+  gap: 2px;
+  flex: 0 0 12px;
+  width: 12px;
+}
+
+/*
+  §4.3: слева — одна строчная буква дня недели, понедельник первым:
+  `m t w t f s s`. Ячейка узкая, поэтому буква всегда одна.
+*/
+.hm-lbs > span,
+.hm-lbs > i,
+.hm-lb {
+  color: var(--fg-dim);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 9px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.hm-cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 9px);
+  grid-auto-columns: 9px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hm-cell {
+  width: 9px;
+  height: 9px;
+  background: var(--hm-0);
+  overflow: hidden;
+}
+
+.hm-cell:hover {
+  outline: 1px solid var(--fg-dim);
+  outline-offset: -1px;
+}
+
+/* Ячейка-день кликабельна (открыть день). */
+button.hm-cell {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.hm-cell--today {
+  outline: 1px solid var(--amber);
+  outline-offset: -1px;
+}
+
+
+/* ==========================================================================
+   11. БАР-ЧАРТ ПО ДНЯМ НЕДЕЛИ (§11)
+   ========================================================================== */
+
+/*
+  §11/§9.14: полоса — РОВНО 20 символов, `▓` заполнено, `░` пусто.
+  Первая колонка — подпись дня, вторая — сама полоса фиксированной
+  ширины 20ch, третья — процент в собственной правой колонке.
+*/
+.wdbars,
+.wbars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.wd {
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 20ch) 4ch;
+  column-gap: var(--sp-2);
+  align-items: baseline;
+  min-width: 0;
+}
+
+.wd-lb {
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Длина полосы — 20 символов, `▓` заполнено, `░` пусто; считает JS. */
+.wd-bar {
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+  color: var(--amber);
+  letter-spacing: 0;
+}
+
+.wd-pct {
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.wd--best .wd-bar {
+  color: var(--amber);
+}
+
+.wd--best .wd-pct {
+  color: var(--fg);
+}
+
+.wd--worst .wd-bar {
+  color: var(--fg-dim);
+}
+
+.wd--worst .wd-pct {
+  color: var(--fg-dim);
+}
+
+
+/* ==========================================================================
+   12. ПРЕСЕТЫ ОКНА ДАННЫХ (§12)
+   ========================================================================== */
+
+/*
+  §6/§9.12: пресеты окна — `[7d] [30d] [90d] [365d] [all]`.
+  Квадратные скобки приходят из JS (screens_a.js передаёт `'[' + id + ']'`),
+  поэтому CSS их НЕ дублирует — иначе получится `[[7d]]`.
+  Активный пресет ярче остальных.
+*/
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--head-h);
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--border-lit);
+  color: var(--fg);
+}
+
+/* Активный пресет ярче остальных. */
+.chip.is-on,
+.chip--on,
+.chip[aria-pressed="true"] {
+  border-color: var(--amber);
+  color: var(--amber);
+  font-weight: 700;
+}
+
+
+/* ==========================================================================
+   13. СПИСОК ЗАДАЧ (§13)
+   ========================================================================== */
+
+.tgroup {
+  margin: 0 0 var(--sp-4);
+  min-width: 0;
+}
+
+.tgroup:last-child {
+  margin-bottom: 0;
+}
+
+/*
+  Заголовок группы: [иконка] название … [2/3] ▾.
+  Иконка (солнце/луна) приходит из JS первым элементом и красится
+  здесь: янтарная для «дневных», фиолетовая для «вечерних».
+  Каретка `.tgroup-a` пустая — глиф рисуется через aria-expanded.
+*/
+.tgroup-h {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  column-gap: var(--sp-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--head-h);
+  padding: 0 var(--sp-2);
+  background: none;
+  border: 0;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tgroup-h:hover {
+  background: var(--bg-raised);
+  color: var(--fg);
+}
+
+/* Иконка группы в заголовке: янтарь по умолчанию. */
+.tgroup-i {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--amber);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* Вечерняя группа — фиолетовым. */
+.tgroup-i--pm,
+.tgroup--evening .tgroup-i,
+.tgroup-i.violet {
+  color: var(--violet);
+}
+
+/* Утренняя/дневная группа — янтарным. */
+.tgroup-i--am,
+.tgroup--morning .tgroup-i,
+.tgroup-i.gold {
+  color: var(--gold);
+}
+
+/* Каретка раскрытия: `▾` раскрыто, `▸` свёрнуто. Элемент пустой. */
+.tgroup-a {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-faint);
+  text-align: center;
+  order: 3;
+}
+
+.tgroup-a::before {
+  content: "\25BE";
+}
+
+.tgroup-h[aria-expanded="false"] .tgroup-a::before,
+.tgroup-h[data-open="false"] .tgroup-a::before {
+  content: "\25B8";
+}
+
+/* Название группы — приглушённое. */
+.tgroup-t {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-dim);
+  order: 2;
+}
+
+.tgroup-h:hover .tgroup-t {
+  color: var(--fg);
+}
+
+/* `[2/3]` — прижата вправо, перед кареткой. */
+.tgroup-c {
+  order: 2;
+  justify-self: end;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tgroup-b {
+  min-width: 0;
+}
+
+.tgroup-h[aria-expanded="false"] + .tgroup-b {
+  display: none;
+}
+
+/* Строки внутри завершённой группы получают отступ в 2 пробела. */
+.tgroup--done .tgroup-b > .trow,
+.tgroup.is-done .tgroup-b > .trow {
+  padding-left: 2ch;
+}
+
+/*
+  Строка задачи: [✓] иконка название … счётчик.
+  Счётчик прижат вправо и приглушён.
+*/
+.trow {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1.2em minmax(0, 1fr) auto;
+  column-gap: var(--sp-2);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--head-h);
+  padding: 0 var(--sp-2) 0 0;
+  background: none;
+  border: 0;
+  color: var(--fg);
+  font: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trow:hover {
+  background: var(--bg-raised);
+}
+
+/* Иконка-эмодзи задачи; `▸` — заглушка. */
+.trow-i {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fg-dim);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.trow-t {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+/* Счётчик справа: `🔥6`, `◐08:40`, `—`. Приглушённый. */
+.trow-d {
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Строка под курсором: инвертированный фон и `▶` слева. */
+.trow--cur,
+.trow[aria-selected="true"] {
+  background: var(--bg-raised);
+}
+
+.trow--cur::before,
+.trow[aria-selected="true"]::before {
+  content: "\25B6";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  color: var(--blue);
+  user-select: none;
+}
+
+
+/* ==========================================================================
+   14. ПРОЧИЕ ЭКРАНЫ (§14)
+   ========================================================================== */
+
+/* --- проекты --- */
+.plist {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.plist-row {
+  display: grid;
+  grid-template-columns: 1.2em minmax(0, 1fr) auto;
+  column-gap: var(--sp-2);
+  align-items: center;
+  min-width: 0;
+  min-height: var(--head-h);
+  padding: 0 var(--sp-2);
+  cursor: pointer;
+}
+
+.plist-row:hover {
+  background: var(--bg-raised);
+}
+
+.plist-row--head {
+  min-height: var(--head-h);
+  color: var(--fg-dim);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.plist-row--head:hover {
+  color: var(--fg);
+}
+
+.plist-i {
+  color: var(--violet);
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.plist-n {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.plist-v {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.plist-bar {
+  grid-column: 2 / -1;
+  margin: 0 0 var(--sp-1);
+}
+
+.plist-note {
+  grid-column: 2 / -1;
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- шаги плана --- */
+.pstep {
+  display: grid;
+  grid-template-columns: auto 1.2em minmax(0, 1fr) auto;
+  column-gap: var(--sp-2);
+  align-items: center;
+  min-width: 0;
+  min-height: var(--head-h);
+  padding: 0 var(--sp-2);
+  cursor: pointer;
+}
+
+.pstep:hover {
+  background: var(--bg-raised);
+}
+
+.pstep-t {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.pstep-d {
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- достижения --- */
+.achgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.ach-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+}
+
+.ach-tile--open,
+.ach-tile.is-open {
+  border-color: var(--gold);
+}
+
+.ach-i {
+  font-size: 16px;
+  line-height: 1.2;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ach-t {
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.ach-tile--open .ach-t,
+.ach-tile.is-open .ach-t {
+  color: var(--gold);
+}
+
+.ach-d {
+  color: var(--fg-dim);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.ach-grid-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+/* --- строки настроек --- */
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  min-height: var(--head-h);
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.set-row:last-child {
+  border-bottom: 0;
+}
+
+.set-k {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.set-v {
+  flex: 0 0 auto;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+.set-row--col {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Примечание вроде «нужно подтверждение» (§14). */
+.set-note,
+.note {
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+/* --- переключатель в настройках --- */
+.sw,
+.switch,
+.tgl,
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--head-h);
+  min-width: 56px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sw::before,
+.switch::before,
+.tgl::before,
+.toggle::before {
+  content: "[ ]";
+  color: var(--fg-faint);
+}
+
+.sw:hover,
+.switch:hover,
+.tgl:hover,
+.toggle:hover {
+  border-color: var(--border-lit);
+  color: var(--fg);
+}
+
+.sw[aria-pressed="true"],
+.switch[aria-pressed="true"],
+.tgl[aria-pressed="true"],
+.toggle[aria-pressed="true"],
+.sw[aria-checked="true"],
+.switch[aria-checked="true"],
+.tgl[aria-checked="true"],
+.toggle[aria-checked="true"],
+.sw.is-on,
+.switch.is-on,
+.tgl.is-on,
+.toggle.is-on {
+  border-color: var(--border-lit);
+  color: var(--fg);
+}
+
+.sw[aria-pressed="true"]::before,
+.switch[aria-pressed="true"]::before,
+.tgl[aria-pressed="true"]::before,
+.toggle[aria-pressed="true"]::before,
+.sw[aria-checked="true"]::before,
+.switch[aria-checked="true"]::before,
+.tgl[aria-checked="true"]::before,
+.toggle[aria-checked="true"]::before,
+.sw.is-on::before,
+.switch.is-on::before,
+.tgl.is-on::before,
+.toggle.is-on::before {
+  content: "[✓]";
+  color: var(--green);
+}
+
+
+/* ==========================================================================
+   15. КНОПКИ И ПОЛЯ ВВОДА
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--hit);
+  padding: 0 var(--sp-7);
+  border: 1px solid var(--border-lit);
+  background: var(--bg-raised);
+  color: var(--fg);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--fg-dim);
+  background: var(--bg-inset);
+}
+
+.btn-ghost {
+  border-color: var(--border);
+  background: none;
+  color: var(--fg-dim);
+}
+
+.btn-ghost:hover {
+  border-color: var(--border-lit);
+  background: var(--bg-raised);
+  color: var(--fg);
+}
+
+.btn-danger {
+  border-color: var(--red);
+  background: none;
+  color: var(--red);
+}
+
+.btn-danger:hover {
+  background: var(--red);
+  color: var(--bg);
+  border-color: var(--red);
+}
+
+/* Кнопка без заливки, с рамкой: `+ привычка`, `+ рутина`. */
+.btn-t {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--head-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-t:hover {
+  border-color: var(--border-lit);
+  background: var(--bg-raised);
+}
+
+/* Варианты кнопки диалога подтверждения. Без них «удалить» и «отмена»
+   выглядели одинаково — а на экране настроек за этой кнопкой стоит
+   удаление всей статистики без возможности отмены. */
+.btn-t--err {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-dim, rgba(248, 81, 73, .10));
+}
+
+.btn-t--err:hover {
+  border-color: var(--red);
+  background: var(--red-dim, rgba(248, 81, 73, .18));
+  color: var(--red);
+}
+
+.btn-t--ok {
+  border-color: var(--border-lit);
+  color: var(--fg);
+}
+
+.btn-t--ok:hover {
+  background: var(--bg-raised);
+}
+
+.btn-t:disabled,
+.btn:disabled,
+.btn[disabled],
+.btn-t[disabled],
+.inp:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.btn-lock {
+  color: var(--fg-faint);
+  border-color: var(--border);
+  cursor: default;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+/* --- поля ввода --- */
+.field {
+  display: block;
+  min-width: 0;
+  margin-bottom: var(--sp-3);
+}
+
+.field-l {
+  display: block;
+  margin-bottom: var(--sp-1);
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+.field-sel {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.field-sel::after {
+  content: "\25BE";
+  position: absolute;
+  right: var(--sp-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg-faint);
+  pointer-events: none;
+}
+
+.inp {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--hit);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--fg);
+  font: inherit;
+  font-size: inherit;
+  line-height: 1.35;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.inp::placeholder {
+  color: var(--fg-faint);
+}
+
+.inp:hover {
+  border-color: var(--border-lit);
+}
+
+.inp:focus-visible {
+  outline: 1px solid var(--border-lit);
+  outline-offset: 0;
+  border-color: var(--border-lit);
+}
+
+textarea.inp {
+  min-height: 84px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+select.inp {
+  padding-right: var(--sp-9);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ползунок в стиле дорожки (§15). */
+.rng,
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 20px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.rng::-webkit-slider-runnable-track,
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+}
+
+.rng::-webkit-slider-thumb,
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 16px;
+  margin-top: -7px;
+  border: 1px solid var(--border-lit);
+  background: var(--gold);
+}
+
+.rng:focus-visible::-webkit-slider-thumb,
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 1px solid var(--blue);
+  outline-offset: 1px;
+}
+
+/* Скрытое поле — обязано оставаться скрытым (§17 «[hidden] не отменяется»). */
+[hidden] {
+  display: none !important;
+}
+
+
+/* ==========================================================================
+   16. МОДАЛКИ, ПОДТВЕРЖДЕНИЯ И УВЕДОМЛЕНИЯ (§16)
+   ========================================================================== */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-7);
+  min-width: 0;
+}
+
+.modal-bd {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  cursor: default;
+}
+
+.modal-card {
+  position: relative;
+  z-index: var(--z-base);
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-width: 100%;
+  max-height: calc(100vh - var(--sp-10));
+  min-width: 0;
+}
+
+.modal-b {
+  flex: 1 1 auto;
+}
+
+.modal-f {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-4);
+  flex: 0 0 auto;
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border);
+}
+
+.modal-f .btn {
+  min-width: 96px;
+}
+
+/* Диалог подтверждения — та же карточка (§16). */
+.confirm-card {
+  width: min(440px, 100%);
+}
+
+.confirm-t {
+  display: block;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.confirm-t::before {
+  content: "? ";
+  color: var(--amber);
+  font-weight: 700;
+}
+
+/* Диалог подтверждения наследует тело и подвал от модалки. */
+.confirm-h {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: var(--head-h);
+  padding: 0 var(--sp-2);
+}
+
+.confirm-b {
+  padding: var(--sp-4);
+}
+
+.confirm-f {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+
+/* Уведомление в правом нижнем углу, исчезает само через 3.5 с. */
+.toast {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  z-index: var(--z-toast);
+  max-width: min(420px, calc(100vw - var(--sp-9)));
+  padding: var(--sp-3) var(--sp-6);
+  border: 1px solid var(--border-lit);
+  background: var(--bg-panel);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.toast::before {
+  content: "\25B8 ";
+  color: var(--fg-dim);
+  user-select: none;
+}
+
+.toast--ok,
+.toast.is-ok {
+  border-color: var(--green);
+}
+
+.toast--err,
+.toast.is-err,
+.toast--error {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.toast--warn,
+.toast.is-warn {
+  border-color: var(--amber);
+}
+
+.toasts {
+  position: fixed;
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  max-width: calc(100vw - var(--sp-9));
+  pointer-events: none;
+}
+
+.toasts > .toast {
+  position: static;
+  right: auto;
+  bottom: auto;
+}
+
+/* Уведомление внутри колонки (не поверх окна). */
+.tui-toast {
+  display: block;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-lit);
+  background: var(--bg-panel);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+
+/* ==========================================================================
+   17. СЛУЖЕБНОЕ
+   ========================================================================== */
+
+/* Кольцо фокуса — везде, где пользователь реально с клавиатуры. */
+:focus-visible {
+  outline: 1px solid var(--border-lit);
+  outline-offset: 1px;
+}
+
+.tui-menu :focus-visible,
+.panel-b :focus-visible,
+.tui-footer :focus-visible {
+  outline-offset: -1px;
+}
+
+.dim {
+  color: var(--fg-dim);
+}
+
+.faint {
+  color: var(--fg-faint);
+}
+
+.gold {
+  color: var(--gold);
+}
+
+.green {
+  color: var(--green);
+}
+
+.amber {
+  color: var(--amber);
+}
+
+.red {
+  color: var(--red);
+}
+
+.blue {
+  color: var(--blue);
+}
+
+.violet {
+  color: var(--violet);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.pre {
+  white-space: pre;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.right {
+  text-align: right;
+}
+
+.center {
+  text-align: center;
+}
+
+.grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Метка только для скринридера. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+  --- вспомогательные блоки, которые приходят из JS без своих правил ---
+  Оформлены здесь, чтобы не остаться с размером шрифта браузера.
+*/
+
+/* Строка «enter выход tab панель» в футере. */
+.tui-fk {
+  display: inline;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.tui-k {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 var(--sp-1);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  font: inherit;
+  text-align: center;
+}
+
+/* Экран справки. */
+.tui-help {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.tui-help-t {
+  color: var(--fg);
+}
+
+.tui-help-r {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--fg-dim);
+}
+
+/* Заглушки загрузки и ошибки. */
+.tui-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-3) 0;
+}
+
+.tui-msg-t,
+.tui-msg-s {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tui-msg-b {
+  margin-top: var(--sp-1);
+}
+
+/* Панель-модалка: заголовок и кнопка закрытия. */
+.modal-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg);
+}
+
+.modal-x {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-height: var(--head-h);
+  padding: 0 var(--sp-2);
+  font-size: inherit;
+}
+
+/* Экран «сегодня»: заголовок дня и список строк. */
+.st,
+.day {
+  min-width: 0;
+}
+
+.st-day {
+  margin-bottom: var(--sp-2);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Строка статуса в левой колонке. */
+.m-statusline {
+  display: block;
+  min-width: 0;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tui-rows,
+.psteps,
+.tgroups {
+  min-width: 0;
+}
+
+.form {
+  min-width: 0;
+}
+
+/* Ползунок с подписью: подпись кнопки-ползунка. */
+.slider-ui {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+
+/* ==========================================================================
+   18. АДАПТИВ
+   Сетка из :root требует 242+325+325+2*13 = 918px плюс поля 2*25 = 968px.
+   Ниже — ступени, на которых три колонки уже не помещаются и вёрстка
+   упрощается. Границы совпадают с корзинами tui.js (`TUI.bucket`):
+   lg ≥1400, md ≥1000, sm ≥720, иначе xs.
+   Минимальная ширина 320 px: сетки не вылезают по горизонтали.
+   ========================================================================== */
+
+/*
+  1180–1439 px (bucket lg): ширины чуть сжаты, поля уменьшены.
+  Три колонки держатся, левая остаётся уже правой.
+*/
+@media (max-width: 1439.98px) {
+  :root {
+    --pad-x: 0px;
+  }
+
+  .tui-body {
+    grid-template-columns: 220fr 300fr 300fr;
+    gap: var(--sp-4);
+  }
+}
+
+/* 1000–1179 px: левая ещё уже, поля минимальные. */
+@media (max-width: 1179.98px) {
+  :root {
+    --pad-x: 0px;
+  }
+
+  .tui-body {
+    grid-template-columns: 208fr 280fr 280fr;
+    gap: var(--sp-4);
+  }
+}
+
+/* 918–1179 px: три колонки ещё помещаются (242+325+325 и два зазора =
+   918), поэтому прячем календарь и вклад только ниже этой отметки.
+   Раньше они прятались уже на 1179px, и при 969px — ширине окна эталона —
+   интерфейс оставался с двумя колонками вместо трёх. */
+@media (max-width: 919.98px) {
+  .tui-col--left .panel--cal,
+  .tui-col--left .panel--hm,
+  .tui-col--left [data-panel="calendar"],
+  .tui-col--left [data-panel="cal"],
+  .tui-col--left [data-panel="hm"],
+  .tui-col--left [data-panel="heatmap"],
+  .tui-col--left [data-panel="year"],
+  [data-screen="overview"] .tui-col--left .panel--cal,
+  [data-screen="overview"] .tui-col--left .panel--hm,
+  [data-screen="overview"] .tui-col--left [data-panel="calendar"],
+  [data-screen="overview"] .tui-col--left [data-panel="cal"],
+  [data-screen="overview"] .tui-col--left [data-panel="hm"],
+  [data-screen="overview"] .tui-col--left [data-panel="heatmap"],
+  [data-screen="overview"] .tui-col--left [data-panel="year"] {
+    display: none;
+  }
+}
+
+/* Ниже 918 px три колонки уже не влезают: остаются центральная и правая,
+   левая скрыта, меню сворачивается в «≡ меню». */
+@media (max-width: 919.98px) {
+  :root {
+    --pad-x: 0px;
+  }
+
+  .tui-body {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: var(--sp-4);
+  }
+
+  .tui-col--left {
+    display: none;
+  }
+
+  /* Пункт «достижения» и цифры скрываются, остаётся `≡ меню`. */
+  .menu-hints,
+  .menu-list {
+    display: none;
+  }
+
+  .menu-more {
+    display: inline-flex;
+  }
+
+  /* Раскрытое меню — выпадающий список под строкой меню. */
+  .tui-menu.is-open .menu-list {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: var(--pad-x);
+    z-index: var(--z-menu);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-1);
+    min-width: 200px;
+    max-width: 100%;
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--border-lit);
+    background: var(--bg-panel);
+    overflow-y: auto;
+  }
+
+  .tui-menu.is-open .menu-sep {
+    display: none;
+  }
+
+  .tui-menu.is-open .mi {
+    width: 100%;
+  }
+}
+
+/* <720 px: одна колонка, панели складываются вертикально, скролл. */
+@media (max-width: 719.98px) {
+  :root {
+    --pad-x: 0px;
+  }
+
+  .tui {
+    gap: var(--sp-3);
+  }
+
+  /* Одна колонка: сетка схлопывается в единственную дорожку. */
+  .tui-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-4);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .tui-col {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .tui-col--right {
+    flex-basis: auto;
+  }
+
+  .tui-col--mid {
+    flex: 0 0 auto;
+  }
+
+  .panel {
+    flex: 0 0 auto;
+  }
+
+  .panel-b,
+  .modal-b {
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  .hm-wrap,
+  .wdbars,
+  .wbars,
+  .cal-grid,
+  .achgrid {
+    max-width: 100%;
+  }
+
+  .achgrid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .tui-footer {
+    font-size: 11px;
+  }
+
+  .modal {
+    padding: var(--sp-4);
+  }
+
+  .modal-card {
+    width: 100%;
+    max-height: calc(100vh - var(--sp-8));
+  }
+}
+
+/* Очень узкое окно (<380 px): поля, полосы и отступы ещё компактнее. */
+@media (max-width: 379.98px) {
+  :root {
+    --pad-x: 0px;
+  }
+
+  .bar-wrap {
+    flex-wrap: wrap;
+    row-gap: var(--sp-2);
+  }
+
+  /* Полоса не должна выпирать за панель на самом узком экране. */
+  .bar {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 24px;
+  }
+
+  .row {
+    column-gap: var(--sp-2);
+  }
+
+  /* Полоса дней недели короче, чтобы не вылезти за 320 px. */
+  .wd {
+    grid-template-columns: 2ch minmax(0, 1fr) 4ch;
+  }
+}
+
+
+/* ==========================================================================
+   19. ПРИВЯЗАННОСТЬ ДВИЖЕНИЯ
+   Никаких переходов, если пользователь этого не просил.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ==========================================================================
+   20. ЦВЕТОВОЙ СЛОЙ: ГРАДИЕНТЫ И АКЦЕНТЫ
+   Слой вынесен в конец файла намеренно: он перекрывает `color`, объявленные
+   выше в §§4–13, иначе каскад отменял бы градиент. Геометрия здесь не
+   трогается вообще — только заливка и цвет текста.
+
+   ПРАВИЛО БЕЗОПАСНОСТИ. Ни прозрачный `color`, ни
+   `-webkit-text-fill-color` не выставляются нигде: прозрачность текста
+   даёт только `background-clip`, а он применяется исключительно внутри
+   @supports ниже. Если движок не умеет background-clip, весь этот блок
+   выбрасывается целиком и остаётся сплошной `color` из соответствующего
+   раздела файла: текст серый, но читаемый. Обратной ситуации не бывает.
+   ========================================================================== */
+
+/* --- 20.1. Полоса прогресса: тёплая рампа слева направо --- */
+/*
+  Самый заметный цветной объект в интерфейсе, поэтому и самый насыщенный.
+  Слева насыщенный янтарь #cb9734, справа светлый #deb365 — 7.6:1 и 10.2:1
+  к треку --bg-inset #08090c, заливка от дорожки не отрывается.
+  Варианты `.bar--near`, `.bar--amber`, `.bar--warn`, `.bar--over`, `.bar--red`
+  сохраняют свой цвет без отдельного сброса: у них специфичность (0,2,0) выше,
+  а сокращение `background` обнуляет background-image.
+*/
+.bar-f {
+  background-image: var(--grad-warm-x);
+}
+
+/* --- 20.2. Активный пункт меню --- */
+/*
+  Градиент красит только буквы (см. @supports ниже). Здесь — подчёркивание и
+  каретка: их цвет текстом не перекрывается, поэтому он сплошной, и берётся
+  --blue-text, чтобы и линия подчёркивания проходила 4.5:1.
+*/
+.mi.is-on,
+.mi.on,
+.mi[aria-current="page"],
+.mi[aria-current="true"] {
+  color: var(--blue);
+  text-decoration-color: var(--blue-text);
+}
+
+.mi.is-on::after,
+.mi.on::after,
+.mi[aria-current="page"]::after,
+.mi[aria-current="true"]::after {
+  color: var(--blue);
+}
+
+/* Маркер `▌` активной панели — тот же синий. */
+.panel.is-focus > .panel-h::before,
+.panel--focus > .panel-h::before,
+.panel[data-focus="true"] > .panel-h::before,
+.panel[data-focused="true"] > .panel-h::before {
+  color: var(--blue-text);
+}
+
+/* --- 20.3. Активный пресет-чип --- */
+/*
+  Рамка остаётся насыщенным янтарём, текст уходит на светлый --amber-tx:
+  на тонировке #39332d он даёт 7.21:1, тогда как #cb9734 на той же подложке
+  даёт 4.76 и близок к порогу.
+*/
+.chip.is-on,
+.chip--on,
+.chip[aria-pressed="true"] {
+  border-color: var(--amber);
+  color: var(--amber-tx);
+  font-weight: 700;
+  background-image: var(--grad-warm-tint);
+}
+
+/* --- 20.4. Ячейка «сегодня» --- */
+/*
+  Оранжевая заливка #f99f61 из §9 превращается в тёплый ramp
+  #f9ab72 → #f4864a; тёмный текст поверх даёт 10.0:1 сверху и 7.6:1 снизу.
+  Рамки: у ячейки обнулены верх и лево (их рисует .cal-grid), поэтому
+  «градиентной рамки» без сдвига сетки не сделать — вместо неё правый и
+  нижний край красятся в тот же оранжевый, и ячейка читается как
+  выделенная рамка. Маркер `▲` из §9 остаётся на месте.
+*/
+.cal-cell--today,
+.cal-cell.is-today {
+  background-image: var(--grad-today);
+  border-right-color: var(--today);
+  border-bottom-color: var(--today);
+}
+
+/* Наведение не должно гасить ramp: `.cal-cell:hover` перебивает заливку,
+   поэтому возвращаем градиент явно. */
+.cal-cell--today:hover,
+.cal-cell.is-today:hover {
+  background-image: var(--grad-today);
+}
+
+/*
+  Число и маркер `▲` — цветом --bg-panel вместо --bg из §9. В тёмной теме
+  токены совпадают (10.0:1 и 7.6:1), а в светлой --bg #e9e5da на верхней
+  ступени заливки давал бы 4.23:1 — ниже порога. --bg-panel #f7f4ed даёт
+  4.84:1 наверху и 6.36:1 внизу.
+*/
+.cal-cell--today .cal-cell-n,
+.cal-cell.is-today .cal-cell-n,
+.cal-cell--today::after,
+.cal-cell.is-today::after {
+  color: var(--bg-panel);
+}
+
+
+/* --- 20.5. Градиентный ТЕКСТ ---
+   Всё, что ниже, красит буквы, поэтому обязано жить внутри @supports.
+   Порядок такой: сначала `background-image`, потом clip. Снаружи блока у
+   каждого из этих элементов уже есть свой `color` из §§5–13 — он и есть
+   запасной путь.
+*/
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+
+  /* --- Заголовки: панели, секции, модалки. Тёплый крем → янтарь. --- */
+  .panel-t,
+  .sec-t,
+  .modal-t {
+    background-image: var(--grad-warm);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /*
+    Наведение на секцию возвращает сплошной --gold: так заголовок меняет
+    вид при наведении, а не остаётся тем же градиентом.
+  */
+  .sec:hover .sec-t {
+    background-image: none;
+  }
+
+  /* --- Иконки секций: по эталону цвет зависит от самой секции.
+         Ключ приходит из JS как `data-sec` на .sec. --- */
+  .sec-i {
+    background-image: var(--grad-warm);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /* ◇ «обзор за всё время», ◴ «по часам», 🏆 «итоги привычек» — тёплые.
+     🏆 цветной эмодзи и градиент не возьмёт: остаётся системный вид. */
+  .sec[data-sec="ov:all"] .sec-i,
+  .sec[data-sec="ov:hourly"] .sec-i,
+  .sec[data-sec="ov:high"] .sec-i {
+    background-image: var(--grad-warm);
+  }
+
+  /* ♨ «серии» — оранжевая. */
+  .sec[data-sec="ov:streak"] .sec-i {
+    background-image: var(--grad-orange);
+  }
+
+  /* ⊞ «окно данных», «дни недели» и ⇶ «ставни выполнения» — синие. */
+  .sec[data-sec="ov:win"] .sec-i,
+  .sec[data-sec="ov:wdays"] .sec-i,
+  .sec[data-sec="ov:rates"] .sec-i,
+  .sec[data-sec="tk:win"] .sec-i,
+  .sec[data-sec="tk:wdays"] .sec-i,
+  .sec[data-sec="tk:rates"] .sec-i {
+    background-image: var(--grad-blue);
+  }
+
+  /* ▣ «проекты» — фиолетовый, как и иконка проекта в списке. */
+  .sec[data-sec="ov:projects"] .sec-i,
+  .plist-i {
+    background-image: var(--grad-violet);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /* --- Значения в строках данных: то, на что смотрит глаз. --- */
+  .row-v,
+  .trow-d,
+  .plist-v,
+  .pstep-d {
+    background-image: var(--grad-warm);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /*
+    Модификаторы значения несут СВОЙ цвет (зелёный «сделано», красный
+    «перерасход», приглушённый и т.д.). У них специфичность (0,2,0), но они
+    задают только `color` — градиент всё равно лёг бы поверх. Поэтому
+    здесь градиент с них снят явно, и обратно включается свой цвет.
+  */
+  .row-v--dim,
+  .row-v--gold,
+  .row-v--green,
+  .row-v--amber,
+  .row-v--red,
+  .row--done .row-v,
+  .trow--done .trow-d,
+  .pstep--done .pstep-d {
+    background-image: none;
+    color: var(--fg);
+  }
+
+  .row-v--dim { color: var(--fg-dim); }
+  .row-v--gold { color: var(--gold); }
+  .row-v--green { color: var(--green); }
+  .row-v--amber { color: var(--amber); }
+  .row-v--red { color: var(--red); }
+
+  /* Завершённые строки гаснут, как в §7. */
+  .row--done .row-v,
+  .trow--done .trow-d,
+  .pstep--done .pstep-d {
+    color: var(--fg-faint);
+  }
+
+  /* --- Полосы по дням недели: тёплый ramp по горизонтали. --- */
+  .wd-bar {
+    background-image: var(--grad-warm-x);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /* Худший день намеренно приглушён (§11) — градиент с него снят. */
+  .wd--worst .wd-bar {
+    background-image: none;
+    color: var(--fg-dim);
+  }
+
+  /* --- Иконки групп задач: тёплая для дня, фиолетовая для вечера. --- */
+  .tgroup-i,
+  .tgroup-i--am,
+  .tgroup--morning .tgroup-i,
+  .tgroup-i.gold {
+    background-image: var(--grad-warm);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  .tgroup-i--pm,
+  .tgroup--evening .tgroup-i,
+  .tgroup-i.violet {
+    background-image: var(--grad-violet);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /* --- Активный пункт меню: синий градиент по буквам. --- */
+  .mi.is-on,
+  .mi.on,
+  .mi[aria-current="page"],
+  .mi[aria-current="true"] {
+    background-image: var(--grad-blue);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /* Каретка `▾` справа — тот же синий. */
+  .mi.is-on::after,
+  .mi.on::after,
+  .mi[aria-current="page"]::after,
+  .mi[aria-current="true"]::after {
+    background-image: var(--grad-blue);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /*
+    Активный чип: подложка уже залита в §20.3, здесь только буквы —
+    светлый --amber-tx, 7.21:1 к тонировке.
+  */
+  .chip.is-on,
+  .chip--on,
+  .chip[aria-pressed="true"] {
+    color: var(--amber-tx);
+  }
+}
+
+/* ============================================================
+   Ступени интенсивности вклада и полос календаря — ПОВТОР.
+
+   Правила `.i0`–`.i5` объявлены на строках 1204–1209, а `.hm-cell` с
+   `background: var(--hm-0)` — на 1319. Специфичность у них одинаковая
+   (0,1,0), поэтому позднее правило перебивало все ступени: в замере
+   браузера ВСЕ клетки отдавали rgb(35,37,47), то есть нулевую ступень.
+   Ниже specificity на класс выше, поэтому побеждает именно ступень.
+   ============================================================ */
+.hm-cell.i0, .cal-bar.i0, .hm-i0 { background: var(--hm-0); }
+.hm-cell.i1, .cal-bar.i1, .hm-i1 { background: var(--hm-1); }
+.hm-cell.i2, .cal-bar.i2, .hm-i2 { background: var(--hm-2); }
+.hm-cell.i3, .cal-bar.i3, .hm-i3 { background: var(--hm-3); }
+.hm-cell.i4, .cal-bar.i4, .hm-i4 { background: var(--hm-4); }
+.hm-cell.i5, .cal-bar.i5, .hm-i5 { background: var(--hm-5); }

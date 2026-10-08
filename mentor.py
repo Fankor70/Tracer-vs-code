@@ -82,7 +82,6 @@ import sys
 import time
 import urllib.error
 import urllib.request
-import uuid
 from datetime import datetime, timedelta
 
 # ============================================================
@@ -118,7 +117,7 @@ DEFAULT_CONFIG = {
 }
 
 # --- Gemini: только СВОЙ ключ пользователя (v2.4.3) -------------------
-# Встроенный демо-ключ AIzaSy… УДАЛЁН: Google нашёл его в открытом
+# Встроенный демо-ключ AIzaSyBkM43… УДАЛЁН: Google нашёл его в открытом
 # репозитории и навсегда отключил (403 «reported as leaked» — проверено
 # живыми запросами v2.4.3). Приложение работает ТОЛЬКО на ключах
 # пользователя. Для Gemini: бесплатный ключ aistudio.google.com/apikey
@@ -214,25 +213,6 @@ DEFAULT_ROLE = """Ты — «Наставник», личный наставни
 
 ПЕРВАЯ СЕССИЯ: студент пришлёт весь код и макет — составь стартовый журнал (блоком ```журнал```) и первую задачу на завтра.
 """
-
-HELPER_ROLE = """Ты — «Помощник», второй ИИ-бот приложения CodeTime: опытный коллега-программист без наставнических ограничений. Пользователь — начинающий фронтенд-разработчик (HTML/CSS/JS, текущий проект — страница товара). Рядом есть «Наставник» с оценками и планом — здесь ты решаешь, а не оцениваешь.
-
-ЧТО ТЫ ДЕЛАЕШЬ:
-- Отвечаешь на ЛЮБЫЕ вопросы: HTML, CSS, JavaScript, React, Python, Git, инструменты, теория — без ограничений по темам и глубине.
-- Просит написать функцию/код — выдаёшь ПОЛНЫЙ готовый код и объясняешь его по шагам. Не режешь задачу «до следующего шага», не прячешь решение.
-- Работаешь с фото: скриншоты кода, ошибок, макетов, интерфейсов — сам разбираешь, что видно, и отвечаешь по существу.
-- Работаешь с файлами, приложенными к сообщению (код из GitHub или с компьютера).
-- Помогаешь отладить ошибку, подобрать решение, сравнить варианты, объяснить чужой код.
-
-ФОРМАТ ОТВЕТА (по умолчанию):
-1. Одной-двумя фразами: что делаем и почему так.
-2. Готовый код целиком в блоке ``` с указанием языка.
-3. Пояснение по шагам: что делает каждая важная часть кода.
-4. Если есть подводные камни или альтернативы — 1–2 коротких замечания.
-
-СТИЛЬ: по-русски, просто, по делу, без вступлений и воды. Если задачу можно решить сразу — решай, не задавай лишних вопросов. Если данных реально не хватает — задай ОДИН короткий вопрос и сразу покажи решение для самого вероятного случая.
-
-ВАЖНО: не выставляй оценок, не веди журнал и план обучения, не отсылай к ним. Если просят «научи» — учи на примерах с кодом, а не вопросами."""
 
 DEFAULT_JOURNAL = """# Журнал прогресса
 
@@ -478,8 +458,6 @@ def api_post(route, data):
     if route == '/api/mentor/chats':
         if data.get('delete'):
             return chat_delete(str(data['delete']))
-        if data.get('setBot'):
-            return chat_set_bot(str(data['setBot']), data)   # v2.6.0
         return chat_create(data)
     if route == '/api/mentor/send':
         return api_send(data)
@@ -1148,23 +1126,6 @@ def build_system_prompt(cfg, mode='free'):
     return p
 
 
-def build_helper_prompt(cfg):
-    """v2.6.0: системный промпт «Помощника» — роль без ограничений + снимок
-    репозитория + среда. Журнал/план/заметки наставника НЕ подставляются."""
-    p = HELPER_ROLE
-    try:
-        cache = json.loads(_read(GH_CACHE_PATH, '{}'))
-        snap = cache.get('snapshot') or ''
-        if snap:
-            p += ('\n\n=== СНИМОК GITHUB-РЕПОЗИТОРИЯ ПОЛЬЗОВАТЕЛЯ (собран %s; '
-                  'если вопрос про его проект — опирайся на этот код) ===\n%s'
-                  % (cache.get('ts', '?'), _tail(snap, 4000)))
-    except (ValueError, TypeError):
-        pass
-    p += '\n\n' + HELPER_ENV_RULES
-    return p
-
-
 def load_history_tail(days=2, cap=30, msg_cap=8000):
     today = datetime.now()
     msgs = []
@@ -1486,15 +1447,6 @@ ENV_RULES = """# СРЕДА (технические детали интерфе�
 - Вкладка «План» показывает план обучения — ученик отмечает этапы выполненными.
 - Вкладка «Журнал» хранит «Журнал прогресса»: он подставляется тебе в начало каждой сессии. Когда выдаёшь обновлённый журнал — выдай его целиком в формате из пункта 5, он сохранится."""
 
-HELPER_ENV_RULES = """# СРЕДА (технические детали интерфейса)
-- Ты «Помощник» в приложении CodeTime. Рядом есть «Наставник» (оценки, журнал, план) — тебе журнал и план не нужны и не приходят.
-- Фото пользователь прикрепляет скрепкой (или Ctrl+V) — картинка приходит тебе прямо в сообщении, разбираешь её сам.
-- Кнопка «GitHub» прикрепляет файлы репозитория — их содержимое придёт вместе с сообщением.
-- Ещё одна кнопка прикрепляет файлы/папки с компьютера (код, текст).
-- Если нужен файл из подключённого репозитория, которого нет в сообщении, закончи ответ строкой ровно вида:
-[НУЖЕН ФАЙЛ: путь/к/файлу]
-(до 3 таких строк за ответ). Файл подтянется автоматически. Не проси файлы, которые уже видишь в сообщении."""
-
 
 # ============================================================
 # v2.1: провайдер OpenRouter + вызов агента по цепочке
@@ -1591,7 +1543,7 @@ def call_agent(role, messages, need_vision=False):
     # 4) резерв без всяких ключей (Pollinations, текст-only)
     if need_vision:
         raise MentorError(
-            'Фото некому разобрать: у резервной модели нет «зрения». '
+            'Фото макета некому разобрать: у резервной модели нет «зрения». '
             'Подключите бесплатный ключ OpenRouter (модель Qwen3.8 — со '
             'зрением) или GitHub-токен в Настройках — и фото заработает. '
             'Детали: ' + ('; '.join(errors[-2:]) if errors else 'нет связи'))
@@ -1669,7 +1621,6 @@ def chats_list():
     for c in arr:
         msgs = _chat_messages(c['id'])
         out.append({'id': c['id'], 'title': c.get('title') or 'Новый чат',
-                    'bot': c.get('bot') or 'mentor',
                     'updatedAt': c.get('updatedAt'),
                     'messageCount': len(msgs)})
     return {'chats': out}
@@ -1693,27 +1644,19 @@ def _chat_messages_save(chat_id, arr):
            json.dumps(arr[-400:], ensure_ascii=False))
 
 
-def chat_bot_of(meta):
-    """v2.6.0: бот чата — 'mentor' (Наставник) или 'helper' (Помощник)."""
-    bot = str((meta or {}).get('bot') or 'mentor').strip()
-    return bot if bot in ('mentor', 'helper') else 'mentor'
-
-
 def chat_create(data):
     ensure_all()
-    # v2.6.0: суффикс из uuid — старый '%04x' от миллисекунд мог совпасть
-    # при быстрых созданиях подряд, и новый чат перезаписывал предыдущий
-    cid = datetime.now().strftime('%Y%m%d%H%M%S') + uuid.uuid4().hex[:6]
+    cid = datetime.now().strftime('%Y%m%d%H%M%S') + \
+        ('%04x' % (int(time.time() * 1000) & 0xffff))
     now = datetime.now().isoformat(timespec='seconds')
-    bot = chat_bot_of({'bot': data.get('bot')})
     chat = {'id': cid, 'title': (str(data.get('title') or 'Новый чат'))[:80],
-            'bot': bot, 'createdAt': now, 'updatedAt': now}
+            'createdAt': now, 'updatedAt': now}
     idx = _chats_index()
     idx.insert(0, chat)
     _chats_index_save(idx)
     _chat_messages_save(cid, [])
-    return {'chat': {'id': cid, 'title': chat['title'], 'bot': bot,
-                     'createdAt': now, 'updatedAt': now, 'messageCount': 0}}
+    return {'chat': {'id': cid, 'title': chat['title'], 'createdAt': now,
+                     'updatedAt': now, 'messageCount': 0}}
 
 
 def chat_get(chat_id):
@@ -1723,7 +1666,6 @@ def chat_get(chat_id):
         raise MentorError('Чат не найден.')
     msgs = _chat_messages(chat_id)
     return {'chat': {'id': chat_id, 'title': meta.get('title') or 'Новый чат',
-                     'bot': chat_bot_of(meta),
                      'updatedAt': meta.get('updatedAt')},
             'messages': msgs}
 
@@ -1748,23 +1690,6 @@ def chat_rename(chat_id, title):
     return {'ok': True}
 
 
-def chat_set_bot(chat_id, data):
-    """v2.6.0: переключить бота чата (Наставник ↔ Помощник).
-    История сохраняется, меняется только роль и системный промпт."""
-    bot = str((data or {}).get('bot') or 'mentor').strip()
-    if bot not in ('mentor', 'helper'):
-        raise MentorError("Неизвестный бот: %s (бывают 'mentor' и 'helper')."
-                          % bot[:40])
-    idx = _chats_index()
-    meta = next((c for c in idx if c['id'] == chat_id), None)
-    if not meta:
-        raise MentorError('Чат не найден.')
-    meta['bot'] = bot
-    meta['updatedAt'] = datetime.now().isoformat(timespec='seconds')
-    _chats_index_save(idx)
-    return {'ok': True, 'bot': bot}
-
-
 NEED_FILE_RE = re.compile(r'\[\s*НУЖЕН ФАЙЛ\s*:\s*([^\]]+?)\s*\]', re.IGNORECASE)
 MAX_MSG_CHARS = 24000
 
@@ -1774,80 +1699,26 @@ def _clip(s, mx=MAX_MSG_CHARS):
     return s[:mx] + '\n…(обрезано)' if len(s) > mx else s
 
 
-def _other_chats_digest(current_id, deep=False):
-    """v2.5.0: память о ДРУГИХ чатах — наставник помнит, что обсуждалось
-    в соседних сессиях. deep=True — вытащить и последние реплики."""
-    out = []
-    try:
-        idx = _chats_index()
-    except Exception:
-        return out
-    for c in idx:
-        if c.get('id') == current_id:
-            continue
-        msgs = _chat_messages(c.get('id'))
-        if not msgs:
-            continue
-        first_user = next((m.get('content') for m in msgs
-                           if m.get('role') == 'user'), '')
-        entry = {'title': c.get('title') or 'Новый чат',
-                 'updated': str(c.get('updatedAt') or '')[:10],
-                 'count': len(msgs),
-                 'topic': _clip(str(first_user or ''), 200)}
-        if deep:
-            convo = []
-            for m in msgs[-8:]:
-                who = 'Ученик' if m.get('role') == 'user' else 'Наставник'
-                convo.append('%s: %s' % (who, _clip(str(m.get('content') or ''), 400)))
-            entry['recent'] = '\n'.join(convo)
-        out.append(entry)
-        if len(out) >= 12:
-            break
-    return out
-
-
-_RECALL_RE = re.compile(
-    r'вспомни|другом чат|другой чат|других чат|прошлых чат|в прошлый раз|'
-    r'раньше делали|мы уже делал|что мы делал', re.IGNORECASE)
-
-
 def api_send(data):
-    """Отправка сообщения в чат: фото → Зрение (наставник) или прямо модели
-    (Помощник), файлы GitHub ИЛИ с компьютера, история, память о других
-    чатах, [НУЖЕН ФАЙЛ] автоподтягивание. Ответ с подписью модели.
-    v2.6.0: второй бот — meta['bot'] == 'helper' (Помощник, без ограничений:
-    полный код + объяснения, фото разбирает сам, журнал/план не ведёт)."""
+    """Отправка сообщения в чат: фото → Зрение, файлы GitHub, история,
+    [НУЖЕН ФАЙЛ] автоподтягивание. Ответ наставника с подписью модели."""
     chat_id = str(data.get('chatId') or '')
     text = (data.get('content') or '').strip()
     image_path = str(data.get('imagePath') or '')
     gh_paths = [str(p) for p in (data.get('githubPaths') or []) if p][:6]
-    # v2.5.0: файлы/папка с компьютера (текст, прочитан на фронте)
-    files_clean = []
-    if isinstance(data.get('files'), list):
-        for f in data['files'][:6]:
-            if not isinstance(f, dict):
-                continue
-            fname = str(f.get('name') or 'файл')[:120]
-            fcontent = str(f.get('content') or '')[:30000]
-            if not fcontent:
-                continue
-            files_clean.append({'name': fname, 'content': fcontent,
-                                'truncated': bool(f.get('truncated'))})
     if not chat_id:
         raise MentorError('Не указан чат.')
-    if not text and not image_path and not gh_paths and not files_clean:
+    if not text and not image_path and not gh_paths:
         raise MentorError('Пустое сообщение.')
     idx = _chats_index()
     meta = next((c for c in idx if c['id'] == chat_id), None)
     if not meta:
         raise MentorError('Чат не найден.')
-    bot = chat_bot_of(meta)   # v2.6.0: 'mentor' | 'helper'
 
     cfg = load_config()
 
-    # 1. Фото: наставнику описывает агент «Зрение», Помощник смотрит сам
+    # 1. Фото макета → агент «Зрение»
     image_note = ''
-    img_direct = None   # v2.6.0: {'mime', 'b64'} — фото напрямую Помощнику
     if image_path:
         safe = os.path.basename(image_path)
         full = os.path.join(LAYOUTS_DIR, safe)
@@ -1863,27 +1734,24 @@ def api_send(data):
         except OSError as e:
             raise MentorError('Не удалось прочитать фото (%s). '
                               'Прикрепите его заново.' % e)
-        if bot == 'helper':
-            img_direct = {'mime': mime, 'b64': b64}
-        else:
-            prompt = LAYOUT_VISION_PROMPT + \
-                ('\n\nВопрос ученика к этому изображению: «%s»' % text if text else '')
-            vision_content = [
-                {'type': 'text', 'text': prompt},
-                {'type': 'image_url', 'image_url': {'url': 'data:%s;base64,%s'
-                                                    % (mime, b64)}},
-            ]
-            try:
-                image_note, _pr, _md, _ms = call_agent(
-                    'vision',
-                    [{'role': 'system', 'content': VISION_SYSTEM},
-                     {'role': 'user', 'content': vision_content}],
-                    need_vision=True)
-            except MentorError as e:
-                image_note = '[vision-модель не смогла разобрать фото: %s]' % e
-            except Exception as e:
-                logging.exception('Наставник: сбой vision-шага: %r', e)
-                image_note = '[vision-модель упала с неожиданной ошибкой: %s]' % e
+        prompt = LAYOUT_VISION_PROMPT + \
+            ('\n\nВопрос ученика к этому изображению: «%s»' % text if text else '')
+        vision_content = [
+            {'type': 'text', 'text': prompt},
+            {'type': 'image_url', 'image_url': {'url': 'data:%s;base64,%s'
+                                                % (mime, b64)}},
+        ]
+        try:
+            image_note, _pr, _md, _ms = call_agent(
+                'vision',
+                [{'role': 'system', 'content': VISION_SYSTEM},
+                 {'role': 'user', 'content': vision_content}],
+                need_vision=True)
+        except MentorError as e:
+            image_note = '[vision-модель не смогла разобрать фото: %s]' % e
+        except Exception as e:
+            logging.exception('Наставник: сбой vision-шага: %r', e)
+            image_note = '[vision-модель упала с неожиданной ошибкой: %s]' % e
 
     # 2. Файлы GitHub, выбранные учеником
     attached = []
@@ -1902,14 +1770,9 @@ def api_send(data):
     # 3. Сообщение ученика
     now = datetime.now().isoformat(timespec='seconds')
     user_msg = {'id': 'm' + str(int(time.time() * 1000)), 'role': 'user',
-                'content': text or ('📎 файлы: ' +
-                                    ', '.join(os.path.basename(f['name'])
-                                              for f in files_clean)
-                                    if files_clean else '(без текста)'),
+                'content': text or '(без текста)',
                 'imagePath': ('layouts/' + image_path) if image_path else '',
-                'imageNote': image_note, 'createdAt': now,
-                'files': [{'name': f['name'], 'chars': len(f['content'])}
-                          for f in files_clean]}
+                'imageNote': image_note, 'createdAt': now}
     msgs = _chat_messages(chat_id)
     msgs.append(user_msg)
 
@@ -1917,29 +1780,9 @@ def api_send(data):
     if (meta.get('title') or 'Новый чат') == 'Новый чат' and text:
         meta['title'] = text[:48]
 
-    # 4. Системный промпт: роль + память + среда (у ботов она разная)
-    if bot == 'helper':
-        system = build_helper_prompt(cfg)
-    else:
-        system = build_system_prompt(cfg, 'free')
-    # v2.5.0: память о других чатах — всегда краткая, по запросу «вспомни…» — подробная
-    deep_memory = bool(text and _RECALL_RE.search(text))
-    digest = _other_chats_digest(chat_id, deep=deep_memory)
-    if digest:
-        parts = []
-        for e in digest:
-            line = ('- «%s» (%s, %d сообщ.): %s'
-                    % (e['title'], e['updated'], e['count'], e['topic']))
-            if e.get('recent'):
-                line += '\n  Последнее из этого чата:\n  ' + \
-                    e['recent'].replace('\n', '\n  ')
-            parts.append(line)
-        system += ('\n\n# ПАМЯТЬ О ДРУГИХ ЧАТАХ (что студент обсуждал с тобой '
-                   'в других сессиях)\nИспользуй как контекст: студент ведёт '
-                   'несколько параллельных чатов, не делай вид, что не в курсе.\n'
-                   + '\n'.join(parts))
-    if bot != 'helper':
-        system += '\n\n' + ENV_RULES
+    # 4. Системный промпт: роль + журнал + план + репозиторий + среда
+    system = build_system_prompt(cfg, 'free')
+    system += '\n\n' + ENV_RULES
     system += '\n\n# СЕГОДНЯ\n' + \
         datetime.now().strftime('%d %B %Y (%A), %H:%M')
 
@@ -1955,30 +1798,11 @@ def api_send(data):
         if m is user_msg and attached:
             c += '\n\n[Файлы из GitHub, приложенные учеником]\n' + \
                 files_to_blocks(attached)
-        if m is user_msg and files_clean:
-            c += '\n\n[Файлы с компьютера ученика]\n' + '\n\n'.join(
-                '--- %s ---\n```\n%s\n```%s'
-                % (f['name'], f['content'],
-                   '\n(файл обрезан по размеру)' if f.get('truncated') else '')
-                for f in files_clean)
         llm_messages.append({'role': 'assistant' if m['role'] == 'assistant'
                              else 'user', 'content': _clip(c)})
 
-    # 6. Ответ бота (агент mentor по цепочке провайдеров)
-    # v2.6.0: Помощник смотрит фото сам — картинка прикрепляется к последнему
-    # сообщению в vision-формате (наставнику фото описывает агент «Зрение»)
-    need_vision = False
-    if bot == 'helper' and img_direct and llm_messages and \
-            llm_messages[-1]['role'] == 'user':
-        llm_messages[-1]['content'] = [
-            {'type': 'text', 'text': llm_messages[-1]['content']},
-            {'type': 'image_url',
-             'image_url': {'url': 'data:%s;base64,%s'
-                           % (img_direct['mime'], img_direct['b64'])}},
-        ]
-        need_vision = True
-    reply, provider, model, _ms = call_agent('mentor', llm_messages,
-                                             need_vision=need_vision)
+    # 6. Ответ наставника (агент mentor по цепочке провайдеров)
+    reply, provider, model, _ms = call_agent('mentor', llm_messages)
 
     # 7. Авто-докачка файлов, если наставник попросил [НУЖЕН ФАЙЛ: …]
     if cfg['repo']:
@@ -2003,8 +1827,7 @@ def api_send(data):
                            '\n\nПродолжи разбор с учётом этих файлов. Не '
                            'повторяй запрос файлов заново.'})
             try:
-                reply, provider, model, _ms = call_agent('mentor', round2,
-                                                         need_vision=need_vision)
+                reply, provider, model, _ms = call_agent('mentor', round2)
             except MentorError:
                 pass   # второй заход не удался — оставим первый ответ
 
@@ -2018,9 +1841,9 @@ def api_send(data):
     meta['updatedAt'] = a_now
     _chats_index_save(idx)
 
-    # «запомни» → notes/notes.md (память наставника, Помощнику не нужна)
+    # «запомни» → notes/notes.md
     note_saved = False
-    if bot != 'helper' and text and _REMEMBER_RE.search(text) and len(text) >= 12:
+    if text and _REMEMBER_RE.search(text) and len(text) >= 12:
         try:
             ensure_all()
             stamp = datetime.now().strftime('%d.%m.%Y %H:%M')
@@ -2031,22 +1854,20 @@ def api_send(data):
             logging.exception('Наставник: не сохранилась заметка «запомни»')
 
     # блоки ```журнал ...``` → journal.md, ```план ...``` → plan.md
-    # v2.6.0: только у наставника — Помощник журнал/план не ведёт
     journal_saved = False
+    for block in _JOURNAL_BLOCK_RE.findall(reply):
+        journal_append(block.strip())
+        journal_saved = True
     plan_saved = False
-    if bot != 'helper':
-        for block in _JOURNAL_BLOCK_RE.findall(reply):
-            journal_append(block.strip())
-            journal_saved = True
-        for block in _PLAN_BLOCK_RE.findall(reply):
-            body = block.strip()
-            if body:
-                _write(PLAN_PATH, body[:100000])
-                plan_saved = True
+    for block in _PLAN_BLOCK_RE.findall(reply):
+        body = block.strip()
+        if body:
+            _write(PLAN_PATH, body[:100000])
+            plan_saved = True
 
     return {'userMessage': user_msg, 'assistantMessage': assistant_msg,
             'noteSaved': note_saved, 'journalSaved': journal_saved,
-            'planSaved': plan_saved, 'bot': bot}
+            'planSaved': plan_saved}
 
 
 def files_to_blocks(files):
@@ -2405,38 +2226,20 @@ _PLAN_PERIOD_RE = re.compile(r'^([А-ЯЁA-Z][а-яёa-z]+(?:\s*\d{4})?)\s*[—:
 
 
 def _plan_items_from_md(md_text):
-    """Парсит plan.md в пункты {id: №строки, period, module, goal, details, done}.
-    v2.5.0: понимает заголовки «## Месяц» и «### Модуль» + строки-пояснения
-    с отступом. Старый плоский формат («- [ ] Месяц — цель») тоже работает."""
+    """Парсит план.md в пункты {id: №строки, period, goal, done}."""
     items = []
-    period, module = '', ''
     for i, line in enumerate((md_text or '').split('\n')):
-        hm = re.match(r'^\s*##\s+(?!#)(.+)$', line)
-        if hm:
-            period, module = hm.group(1).strip(), ''
-            continue
-        hm3 = re.match(r'^\s*###\s+(.+)$', line)
-        if hm3:
-            module = hm3.group(1).strip()
-            continue
         m = re.match(r'^\s*-\s*\[([ xX])\]\s*(.*)$', line)
-        if m:
-            done = m.group(1).lower() == 'x'
-            rest = m.group(2).strip()
-            pm = _PLAN_PERIOD_RE.match(rest)
-            if pm and len(pm.group(1)) <= 20:
-                goal = pm.group(2).strip()
-                period2 = '' if period else pm.group(1).strip()
-            else:
-                period2, goal = '', rest
-            items.append({'id': i, 'period': period or period2, 'module': module,
-                          'goal': goal, 'details': '', 'done': done})
+        if not m:
             continue
-        # пояснение к предыдущей задаче (строка с отступом, не чекбокс/заголовок)
-        if (items and line.strip() and not line.lstrip().startswith('#')
-                and re.match(r'^\s{2,}\S', line)):
-            items[-1]['details'] = (items[-1]['details'] + ' ' +
-                                    line.strip()).strip()[:500]
+        done = m.group(1).lower() == 'x'
+        rest = m.group(2).strip()
+        pm = _PLAN_PERIOD_RE.match(rest)
+        if pm and len(pm.group(1)) <= 20:
+            period, goal = pm.group(1).strip(), pm.group(2).strip()
+        else:
+            period, goal = '', rest
+        items.append({'id': i, 'period': period, 'goal': goal, 'done': done})
     return items
 
 
@@ -2468,11 +2271,9 @@ def api_plan_patch(data):
 
 PLAN_AI_INSTRUCTION = """Обнови план обучения ученика (вкладка «План» в интерфейсе). Опирайся на роль, прежний план, журнал и сегодняшнюю дату: сдвинь этапы так, чтобы цель «Junior/Middle к апрелю 2027» была реалистичной с учётом того, что уже сделано.
 
-Структура плана: разделы-месяцы, внутри каждого месяца 2–4 подраздела (модуля), внутри модуля 2–4 конкретные задачи с чекбоксами.
-
-Верни СТРОГО JSON-массив без пояснений и без markdown-обёртки. Каждый элемент — ОДНА задача:
-{"period": "Месяц ГГГГ", "module": "название подраздела", "goal": "задача одной фразой", "details": "1-2 предложения: как именно делаем"}
-Правила: периоды — с текущего месяца по апрель 2027 включительно (уже пройденное не включай); в каждом месяце 2–4 разных module (для задач одного подраздела повторяй тот же module); в каждом module 2–4 задачи; задачи конкретные и проверяемые. Только JSON."""
+Верни СТРОГО JSON-массив без пояснений и без markdown-обёртки, каждый элемент:
+[{"period": "Месяц ГГГГ", "goal": "цель одной фразой", "details": "1-2 предложения: что конкретно делаем"}, ...]
+Периоды — с текущего месяца по апрель 2027 включительно (уже пройденное не включай). От 4 до 10 пунктов. Только JSON."""
 
 
 def api_plan_ai():
@@ -2504,24 +2305,15 @@ def api_plan_ai():
     if not isinstance(arr, list) or not arr:
         raise MentorError('Пустой план от наставника.')
     lines = ['# План обучения — Junior/Middle к апрелю 2027', '']
-    cur_period = cur_module = None
-    for it in arr[:48]:
+    for it in arr[:12]:
         if not isinstance(it, dict):
             continue
         period = str(it.get('period') or '').strip()[:60]
-        module = str(it.get('module') or '').strip()[:80]
         goal = str(it.get('goal') or '').strip()[:300]
         details = str(it.get('details') or '').strip()[:2000]
         if not goal:
             continue
-        # v2.5.0: структура Месяц → Модуль → задачи (чекбоксы кликабельны)
-        if period and period != cur_period:
-            lines += ['', '## %s' % period]
-            cur_period, cur_module = period, None
-        if module and module != cur_module:
-            lines += ['', '### %s' % module]
-            cur_module = module
-        lines.append('- [ ] %s' % goal)
+        lines.append('- [ ] %s%s' % ((period + ' — ') if period else '', goal))
         if details:
             lines.append('  %s' % details)
     lines.append('')
